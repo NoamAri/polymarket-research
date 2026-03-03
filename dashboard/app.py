@@ -316,7 +316,7 @@ def load_markets() -> pd.DataFrame:
         ltp = row.get("lastTradePrice", 0)
         try:
             p = float(ltp)
-            if 0.05 <= p <= 0.95: return round(p, 3)
+            if 0 < p < 1: return round(p, 3)
         except Exception: pass
         return None
 
