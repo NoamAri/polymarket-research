@@ -259,6 +259,14 @@ def load_markets() -> pd.DataFrame:
     if "endDate" in df.columns:
         df["end_month"] = df["endDate"].dt.to_period("M").astype(str)
 
+    # dynamically grab the top categories used in the header 
+    import src.collect.fetch_events as fetcher
+    try:
+        top_cats = fetcher.get_top_categories(14)
+        top_labels = [tc["label"] for tc in top_cats]
+    except Exception:
+        top_labels = ["Politics", "Sports", "Crypto", "Pop Culture", "Business", "Science", "World", "Games"]
+
     def extract_primary_tag(row):
         # 1) Try standard market 'category'
         cat = row.get("category")
@@ -284,18 +292,35 @@ def load_markets() -> pd.DataFrame:
 
         if not c:
             return "Other"
-        
-        c = str(c).strip()
-        if c.lower() in ["trump presidency", "trump"]:
-            return "Trump"
-        if c.lower() in ["us-current-affairs", "us-politics", "politics"]:
-            return "US Politics"
-        if c.lower() in ["pop-culture ", "pop culture", "pop-culture"]:
-            return "Pop Culture"
-        if c.lower() in ["counter-strike", "csgo"]:
-            return "CS:GO"
             
-        return c.replace("-", " ").title()
+        c_lower = str(c).lower().strip()
+        quest_lower = str(row.get("question", "")).lower()
+        combined_text = c_lower + " " + quest_lower
+        
+        # Exact match to one of the dynamic header labels?
+        for label in top_labels:
+            if label.lower() == c_lower or label.lower() in c_lower:
+                return label
+
+        # Heuristic mapping for common subsets into main Root Tabs
+        if "trump" in combined_text or "maga" in combined_text: 
+            return "Trump"
+        if any(k in combined_text for k in ["politic", "election", "biden", "democrat", "republican"]): 
+            return "Politics"
+        if any(k in combined_text for k in ["crypto", "btc", "bitcoin", "eth", "ethereum", "sol", "solana", "xrp", "defi", "nft"]): 
+            return "Crypto"
+        if any(k in combined_text for k in ["sport", "liga", "nba", "nfl", "soccer", "tennis", "serie", "premier league", "champions league", "f1", "nhl", "fifa"]): 
+            return "Sports"
+        if any(k in combined_text for k in ["culture", "pop", "music", "movie", "award", "oscar", "grammy"]): 
+            return "Culture"
+        if any(k in combined_text for k in ["game", "csgo", "cs2", "counter-strike", "esport", "dota"]): 
+            return "Games"
+        if any(k in combined_text for k in ["world", "geopolitic", "europe", "middle east", "asia", "war", "israel", "ukraine", "russia"]): 
+            return "World"
+        if any(k in combined_text for k in ["tweet", "musk", "x.com"]): 
+            return "Tweet Markets"
+
+        return "Other"
 
     df["primary_tag"] = df.apply(extract_primary_tag, axis=1)
 

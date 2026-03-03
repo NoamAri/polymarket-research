@@ -8,7 +8,7 @@ Returns events with their embedded markets for a given tag_slug.
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 
 import requests
 
@@ -25,7 +25,7 @@ def fetch_events_by_category(
     tag_slug: Optional[str] = None,
     max_pages: int = 5,
     include_closed: bool = True,
-) -> list[dict]:
+) -> List[Dict]:
     """
     Fetch events from the Gamma API, optionally filtered by tag_slug.
 
@@ -41,7 +41,7 @@ def fetch_events_by_category(
 
     Returns
     -------
-    list[dict]
+    List[Dict]
         List of event dicts, each containing a 'markets' list.
     """
     all_events = []
@@ -88,7 +88,7 @@ def fetch_events_by_category(
     return all_events
 
 
-def get_top_categories(limit: int = 15) -> list[dict]:
+def get_top_categories(limit: int = 15) -> List[Dict]:
     """
     Fetch top category tags from the events API by scanning high-volume events.
 
@@ -140,7 +140,7 @@ def get_top_categories(limit: int = 15) -> list[dict]:
     return results[:limit]
 
 
-def fetch_price_history(token_id: str, fidelity: int = 60) -> list[dict]:
+def fetch_price_history(token_id: str, fidelity: int = 60) -> List[Dict]:
     """
     Fetch price history for a CLOB token from the Polymarket CLOB API.
 
@@ -153,7 +153,7 @@ def fetch_price_history(token_id: str, fidelity: int = 60) -> list[dict]:
 
     Returns
     -------
-    list[dict]
+    List[Dict]
         List of {"t": unix_timestamp, "p": price_float} dicts.
     """
     try:
@@ -171,7 +171,7 @@ def fetch_price_history(token_id: str, fidelity: int = 60) -> list[dict]:
     return []
 
 
-def fetch_newspaper_events(limit: int = 50) -> list[dict]:
+def fetch_newspaper_events(limit: int = 50) -> List[Dict]:
     """
     Fetch the absolute newest events globally across Polymarket.
     Used for the live "Newspaper" feed.
