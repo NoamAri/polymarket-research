@@ -3,6 +3,6 @@ pandas
 numpy
 lightgbm
 scikit-learn
-streamlit
-plotly
+streamlit>=1.30.0
+plotly>=5.18.0
 tqdm
