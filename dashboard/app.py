@@ -16,7 +16,12 @@ import streamlit as st
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 import config  # noqa: E402
-from src.collect.fetch_events import fetch_events_by_category, get_top_categories  # noqa: E402
+
+# Force Streamlit to drop its stale module cache
+import importlib
+import src.collect.fetch_events
+importlib.reload(src.collect.fetch_events)
+from src.collect.fetch_events import fetch_events_by_category, get_top_categories, fetch_newspaper_events  # noqa: E402
 
 # ── Page config ───────────────────────────────────────────────
 st.set_page_config(
@@ -395,8 +400,6 @@ if app_mode == "📰 Live Newspaper":
     with col2:
         if st.button("🔄 Refresh Feed", use_container_width=True):
             st.rerun()
-            
-    from src.collect.fetch_events import fetch_newspaper_events
     import time
     
     with st.spinner("Catching up on the news..."):
