@@ -10,7 +10,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 
 import requests
 
@@ -43,6 +43,7 @@ FIELDS_TO_EXTRACT = [
     "endDate",
     "closedTime",
     "tags",
+    "category",
     "clobTokenIds",
     "conditionId",
     "lastTradePrice",
@@ -59,7 +60,7 @@ def extract_fields(market: dict) -> dict:
     return {field: market.get(field) for field in FIELDS_TO_EXTRACT}
 
 
-def load_existing() -> list[dict]:
+def load_existing() -> List[Dict]:
     """Load previously saved markets from disk, if any."""
     if OUTPUT_PATH.exists():
         with open(OUTPUT_PATH, "r", encoding="utf-8") as f:
@@ -69,14 +70,14 @@ def load_existing() -> list[dict]:
     return []
 
 
-def save_markets(markets: list[dict]) -> None:
+def save_markets(markets: List[Dict]) -> None:
     """Write the market list to JSON."""
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         json.dump(markets, f, indent=2, ensure_ascii=False)
 
 
-def fetch_page(offset: int) -> list[dict]:
+def fetch_page(offset: int) -> List[Dict]:
     """
     Fetch a single page of resolved markets from the Gamma API.
     Retries up to MAX_RETRIES times with exponential backoff.
@@ -109,7 +110,7 @@ def fetch_page(offset: int) -> list[dict]:
                 raise last_exception
 
 
-def fetch_markets(max_pages: Optional[int] = None) -> list[dict]:
+def fetch_markets(max_pages: Optional[int] = None) -> List[Dict]:
     """
     Incrementally fetch resolved markets.
 
@@ -126,7 +127,7 @@ def fetch_markets(max_pages: Optional[int] = None) -> list[dict]:
 
     Returns
     -------
-    list[dict]
+    List[Dict]
         The full market list (existing + newly fetched).
     """
     all_markets = load_existing()

@@ -116,9 +116,17 @@ def get_top_categories(limit: int = 15) -> list[dict]:
 
         for ev in events:
             for tag in ev.get("tags") or []:
-                slug = tag.get("slug", "")
-                label = tag.get("label", "")
-                if slug and label and label != "All":
+                raw_slug = tag.get("slug", "")
+                raw_label = tag.get("label", "")
+                
+                if raw_slug and raw_label and raw_label != "All":
+                    if raw_slug in ["trump-presidency", "trump"]:
+                        slug, label = "trump", "Trump"
+                    elif raw_slug == "us-current-affairs" or raw_slug == "us-politics":
+                        slug, label = "us-politics", "US Politics"
+                    else:
+                        slug, label = raw_slug, raw_label.strip()
+                        
                     tag_counter[slug] += 1
                     tag_labels[slug] = label
 

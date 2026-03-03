@@ -259,18 +259,23 @@ def load_markets() -> pd.DataFrame:
     if "endDate" in df.columns:
         df["end_month"] = df["endDate"].dt.to_period("M").astype(str)
 
-    def extract_primary_tag(tags_val):
-        if not isinstance(tags_val, list) or len(tags_val) == 0:
+    def extract_primary_tag(row):
+        # We will map similar categories together and use 'category' string natively where available
+        cat = row.get("category")
+        if pd.isna(cat) or not cat:
             return "Other"
-        first_tag = tags_val[0]
-        if isinstance(first_tag, dict):
-            # Prefer the pretty label, fallback to slug, then 'Other'
-            return first_tag.get("label") or first_tag.get("slug") or "Other"
-        elif isinstance(first_tag, str):
-            return first_tag
-        return "Other"
+        
+        c = str(cat).strip()
+        if c == "Trump Presidency" or c == "Trump":
+            return "Trump"
+        if c == "Pop-Culture ":  # handle Polymarket trailing space
+            return "Pop Culture"
+        if c == "US-current-affairs":
+            return "US Politics"
+            
+        return c.replace("-", " ").title()
 
-    df["primary_tag"] = df["tags"].apply(extract_primary_tag)
+    df["primary_tag"] = df.apply(extract_primary_tag, axis=1)
 
     def derive_winner(row):
         outcomes = row.get("outcomes", [])
