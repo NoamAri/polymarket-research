@@ -161,3 +161,27 @@ def fetch_price_history(token_id: str, fidelity: int = 60) -> list[dict]:
     except Exception:
         pass
     return []
+
+
+def fetch_newspaper_events(limit: int = 50) -> list[dict]:
+    """
+    Fetch the absolute newest events globally across Polymarket.
+    Used for the live "Newspaper" feed.
+    """
+    params = {
+        "limit": limit,
+        "offset": 0,
+        "order": "createdAt",  # Get the newest
+        "ascending": "false",
+        "closed": "false",     # Only open, actionable news
+    }
+    
+    try:
+        resp = requests.get(config.EVENTS_ENDPOINT, params=params, timeout=30)
+        resp.raise_for_status()
+        raw = resp.json()
+        
+        # Filter for quality: must have markets
+        return [ev for ev in raw if ev.get("markets")]
+    except Exception:
+        return []

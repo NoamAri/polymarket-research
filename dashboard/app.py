@@ -152,6 +152,35 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .pnl-lose { color: #fca5a5; font-weight: 500; }
 .pnl-note { color: rgba(255,255,255,0.3); font-size: 0.72rem; font-style: italic; }
 
+/* Newspaper View */
+.news-header {
+    font-size: 2.2rem; font-weight: 800; font-family: 'Georgia', serif;
+    text-align: center; border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 1rem; margin-bottom: 2rem; color: #f8fafc;
+    letter-spacing: -0.02em;
+}
+.news-article {
+    background: rgba(255,255,255,0.02);
+    border-left: 3px solid #60a5fa;
+    padding: 1.5rem; margin-bottom: 1.5rem;
+    border-radius: 0 12px 12px 0;
+}
+.news-headline {
+    font-size: 1.3rem; font-weight: 700; color: #e2e8f0;
+    margin-bottom: 0.5rem; line-height: 1.4;
+}
+.news-meta {
+    font-size: 0.8rem; color: #94a3b8; font-weight: 500;
+    margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.news-body {
+    font-size: 1rem; color: #cbd5e1; line-height: 1.6;
+}
+.news-odds {
+    margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex; gap: 1rem; flex-wrap: wrap;
+}
+
 .section-header {
     font-size: 1.3rem; font-weight: 600; color: #e2e8f0;
     margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem;
@@ -322,7 +351,16 @@ df = load_markets()
 with st.sidebar:
     st.markdown("## 🔮 Polymarket Research")
     st.markdown("---")
-    st.markdown("### 📡 Data Fetching")
+    
+    app_mode = st.radio(
+        "Navigation",
+        ["📰 Live Newspaper", "📊 Market Browser"],
+        label_visibility="collapsed"
+    )
+    st.markdown("---")
+    
+    if app_mode == "📊 Market Browser":
+        st.markdown("### 📡 Data Fetching")
 
     data_file = config.DATA_RAW / "markets_raw.json"
     if data_file.exists():
@@ -344,9 +382,98 @@ with st.sidebar:
         st.info("☁️ App is running in the cloud. Static offline dataset is loaded. Fetching is disabled.")
 
 # ══════════════════════════════════════════════════════════════
-# PAGE HEADER + CATEGORY BAR
+# NEWSPAPER MODE
 # ══════════════════════════════════════════════════════════════
 
+if app_mode == "📰 Live Newspaper":
+    st.markdown('<div class="news-header">The Polymarket Chronicle</div>', unsafe_allow_html=True)
+    st.markdown("*Your real-time feed of the freshest breaking markets across the globe.*")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown("### 🗞️ Latest Stories")
+    with col2:
+        if st.button("🔄 Refresh Feed", use_container_width=True):
+            st.rerun()
+            
+    from src.collect.fetch_events import fetch_newspaper_events
+    import time
+    
+    with st.spinner("Catching up on the news..."):
+        news_events = fetch_newspaper_events(limit=25)
+        
+    if not news_events:
+        st.info("No fresh news available right now.")
+        st.stop()
+        
+    for ev in news_events:
+        title = ev.get("title", "Breaking Market")
+        markets = ev.get("markets", [])
+        if not markets: continue
+        
+        # Pick the most interesting market (usually the first)
+        mkt = markets[0]
+        question = mkt.get("question", "")
+        m_vol = float(mkt.get("volume", 0) or 0)
+        
+        # Format tags
+        tags = [t.get("label", "") for t in (ev.get("tags") or []) if t.get("label") and t.get("label") != "All"]
+        tag_str = " · ".join(tags[:3]).upper() if tags else "BREAKING"
+        
+        # Parse outcomes and prices
+        outcomes_raw = mkt.get("outcomes", "[]")
+        prices_raw = mkt.get("outcomePrices", "[]")
+        outcomes_list = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else (outcomes_raw or [])
+        prices_list = json.loads(prices_raw) if isinstance(prices_raw, str) else (prices_raw or [])
+        
+        # Generate editorial paragraph
+        editorial = ""
+        highest_prob = 0
+        fav_outcome = ""
+        for o, p in zip(outcomes_list, prices_list):
+            try:
+                pf = float(p)
+                if pf > highest_prob:
+                    highest_prob = pf
+                    fav_outcome = o
+            except Exception: pass
+            
+        if highest_prob >= 0.85:
+            editorial = f"The crowd is overwhelmingly confident that {fav_outcome} will happen, giving it a massive {highest_prob:.0%} implied probability right out of the gate."
+        elif highest_prob >= 0.60:
+            editorial = f"Early indicators lean towards {fav_outcome} with a {highest_prob:.0%} chance, but the market is still finding its footing as news develops."
+        elif highest_prob > 0:
+            editorial = f"It is a highly contested toss-up! No single outcome has secured a strong lead, with {fav_outcome} barely edging out the competition at {highest_prob:.0%}."
+        else:
+            editorial = "The market has just opened and odds are highly volatile as traders react to the news."
+            
+        body_text = f"A new market has just surfaced regarding '{title}'. {editorial} Traders have already injected {format_volume(m_vol)} into this market. As the situation unfolds, we will see how these odds shift in real-time."
+        
+        price_tags = []
+        for o, p in zip(outcomes_list[:4], prices_list[:4]):
+            try: price_tags.append(f'<span class="tag">{o}: {float(p):.0%}</span>')
+            except Exception: pass
+        odds_html = f'<div class="news-odds">{"".join(price_tags)}</div>' if price_tags else ""
+        
+        st.markdown(f"""
+        <div class="news-article">
+            <div class="news-meta">{tag_str}</div>
+            <div class="news-headline">{question}</div>
+            <div class="news-body">{body_text}</div>
+            {odds_html}
+        </div>
+        """, unsafe_allow_html=True)
+        
+    st.markdown("---")
+    st.caption("Auto-generated editorial insights based on real-time API volume and odds.")
+    st.stop()
+
+
+# ══════════════════════════════════════════════════════════════
+# MARKET BROWSER MODE (Everything below runs if not Newspaper)
+# ══════════════════════════════════════════════════════════════
+
+# PAGE HEADER + CATEGORY BAR
 st.markdown("# 🔮 Polymarket Research")
 st.markdown("*Browse prediction markets by category — past outcomes and live bets.*")
 
