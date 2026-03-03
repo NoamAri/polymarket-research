@@ -259,9 +259,18 @@ def load_markets() -> pd.DataFrame:
     if "endDate" in df.columns:
         df["end_month"] = df["endDate"].dt.to_period("M").astype(str)
 
-    df["primary_tag"] = df["tags"].apply(
-        lambda tl: tl[0] if isinstance(tl, list) and len(tl) > 0 else "Other"
-    )
+    def extract_primary_tag(tags_val):
+        if not isinstance(tags_val, list) or len(tags_val) == 0:
+            return "Other"
+        first_tag = tags_val[0]
+        if isinstance(first_tag, dict):
+            # Prefer the pretty label, fallback to slug, then 'Other'
+            return first_tag.get("label") or first_tag.get("slug") or "Other"
+        elif isinstance(first_tag, str):
+            return first_tag
+        return "Other"
+
+    df["primary_tag"] = df["tags"].apply(extract_primary_tag)
 
     def derive_winner(row):
         outcomes = row.get("outcomes", [])
@@ -1026,20 +1035,27 @@ with ch4:
         cat_acc = (acc_df.groupby("primary_tag")["crowd_was_right"]
                    .agg(["mean", "count"]).reset_index())
         cat_acc.columns = ["Category", "Accuracy", "Count"]
-        cat_acc = cat_acc[cat_acc["Count"] >= 5].sort_values("Accuracy", ascending=False).head(12)
-        cat_acc["AccPct"] = (cat_acc["Accuracy"] * 100).round(1)
-        fig_acc = px.bar(cat_acc, x="AccPct", y="Category", orientation="h",
-                         title="Crowd Accuracy by Category (%)", color="AccPct",
-                         color_continuous_scale=["#ef4444", "#f59e0b", "#22c55e"],
-                         range_color=[40, 90],
-                         labels={"AccPct": "Accuracy (%)", "Category": ""},
-                         text="AccPct")
-        fig_acc.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
-        fig_acc.add_vline(x=50, line_dash="dash", line_color="rgba(255,255,255,0.2)",
-                          annotation_text="Random", annotation_font_size=10)
-        fig_acc.update_layout(**CHART_LAYOUT, coloraxis_showscale=False, height=300)
-        fig_acc.update_yaxes(autorange="reversed", gridcolor="rgba(255,255,255,0.05)")
-        st.plotly_chart(fig_acc, use_container_width=True)
+        
+        # Only categories with enough resolved data
+        cat_acc = cat_acc[cat_acc["Count"] >= 5]
+        
+        if not cat_acc.empty:
+            cat_acc = cat_acc.sort_values("Accuracy", ascending=True).tail(12)  # Sort ASC so the best forms the top bar
+            cat_acc["AccPct"] = (cat_acc["Accuracy"] * 100).round(1)
+            
+            fig_acc = px.bar(cat_acc, x="AccPct", y="Category", orientation="h",
+                             title="Crowd Accuracy by Category (%)", color="AccPct",
+                             color_continuous_scale=["#ef4444", "#f59e0b", "#22c55e"],
+                             range_color=[40, 90],
+                             labels={"AccPct": "Accuracy (%)", "Category": ""},
+                             text="AccPct")
+            fig_acc.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+            fig_acc.add_vline(x=50, line_dash="dash", line_color="rgba(255,255,255,0.2)",
+                              annotation_text="Random", annotation_font_size=10)
+            fig_acc.update_layout(**CHART_LAYOUT, coloraxis_showscale=False, height=350)
+            st.plotly_chart(fig_acc, use_container_width=True)
+        else:
+            st.info("Not enough resolved markets in these categories to calculate accuracy.")
 
 # ── Charts Row 3: Analyst Insights ────────────────────────────
 st.markdown('<div class="section-header">🔬 Analyst Insights</div>', unsafe_allow_html=True)
