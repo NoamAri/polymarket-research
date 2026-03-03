@@ -260,18 +260,40 @@ def load_markets() -> pd.DataFrame:
         df["end_month"] = df["endDate"].dt.to_period("M").astype(str)
 
     def extract_primary_tag(row):
-        # We will map similar categories together and use 'category' string natively where available
+        # 1) Try standard market 'category'
         cat = row.get("category")
-        if pd.isna(cat) or not cat:
+        c = None
+        if pd.notna(cat) and cat:
+            c = str(cat).strip()
+            
+        # 2) Fallback to the 'series' embedded in the parent event (older markets)
+        if not c:
+            events = row.get("events")
+            if isinstance(events, list) and len(events) > 0:
+                ev = events[0]
+                if isinstance(ev, dict):
+                    # Try direct seriesSlug
+                    c = ev.get("seriesSlug")
+                    # Try first series title
+                    if not c:
+                        series = ev.get("series")
+                        if isinstance(series, list) and len(series) > 0:
+                            s = series[0]
+                            if isinstance(s, dict):
+                                c = s.get("title") or s.get("slug")
+
+        if not c:
             return "Other"
         
-        c = str(cat).strip()
-        if c == "Trump Presidency" or c == "Trump":
+        c = str(c).strip()
+        if c.lower() in ["trump presidency", "trump"]:
             return "Trump"
-        if c == "Pop-Culture ":  # handle Polymarket trailing space
-            return "Pop Culture"
-        if c == "US-current-affairs":
+        if c.lower() in ["us-current-affairs", "us-politics", "politics"]:
             return "US Politics"
+        if c.lower() in ["pop-culture ", "pop culture", "pop-culture"]:
+            return "Pop Culture"
+        if c.lower() in ["counter-strike", "csgo"]:
+            return "CS:GO"
             
         return c.replace("-", " ").title()
 

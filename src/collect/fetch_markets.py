@@ -44,6 +44,7 @@ FIELDS_TO_EXTRACT = [
     "closedTime",
     "tags",
     "category",
+    "events",
     "clobTokenIds",
     "conditionId",
     "lastTradePrice",
