@@ -8,6 +8,7 @@ Returns events with their embedded markets for a given tag_slug.
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 import requests
 
@@ -21,7 +22,7 @@ BACKOFF_FACTOR = 2
 
 
 def fetch_events_by_category(
-    tag_slug: str | None = None,
+    tag_slug: Optional[str] = None,
     max_pages: int = 5,
     include_closed: bool = True,
 ) -> list[dict]:

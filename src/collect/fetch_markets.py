@@ -10,6 +10,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 import requests
 
@@ -108,7 +109,7 @@ def fetch_page(offset: int) -> list[dict]:
                 raise last_exception
 
 
-def fetch_markets(max_pages: int | None = None) -> list[dict]:
+def fetch_markets(max_pages: Optional[int] = None) -> list[dict]:
     """
     Incrementally fetch resolved markets.
 
