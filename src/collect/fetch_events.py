@@ -171,25 +171,65 @@ def fetch_price_history(token_id: str, fidelity: int = 60) -> List[Dict]:
     return []
 
 
-def fetch_newspaper_events(limit: int = 50) -> List[Dict]:
+def fetch_newspaper_events(limit: int = 15) -> List[Dict]:
     """
-    Fetch the absolute newest events globally across Polymarket.
-    Used for the live "Newspaper" feed.
+    Fetch CURRENT, ACTIVE, high-interest events for the newspaper.
+
+    Strategy: sort by 24h volume (active trading), filter for meaningful
+    volume, penalize far-future events, boost events resolving soon.
     """
+    from datetime import datetime, timezone, timedelta
+
+    fetch_limit = min(limit * 4, 100)
     params = {
-        "limit": limit,
+        "limit": fetch_limit,
         "offset": 0,
-        "order": "createdAt",  # Get the newest
+        "order": "volume24hr",
         "ascending": "false",
-        "closed": "false",     # Only open, actionable news
+        "closed": "false",
+        "active": "true",
     }
-    
+
     try:
         resp = requests.get(config.EVENTS_ENDPOINT, params=params, timeout=30)
         resp.raise_for_status()
         raw = resp.json()
-        
-        # Filter for quality: must have markets
-        return [ev for ev in raw if ev.get("markets")]
     except Exception:
         return []
+
+    if not raw:
+        return []
+
+    now = datetime.now(timezone.utc)
+    six_months = now + timedelta(days=180)
+
+    scored = []
+    for ev in raw:
+        markets = ev.get("markets", [])
+        if not markets:
+            continue
+
+        vol_24h = float(ev.get("volume24hr", 0) or 0)
+        vol_total = float(ev.get("volume", 0) or 0)
+        competitive = float(ev.get("competitive", 0) or 0)
+
+        if vol_24h < 1000 and vol_total < 10000:
+            continue
+
+        time_score = 1.0
+        end_str = ev.get("endDate")
+        if end_str:
+            try:
+                end_dt = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                if end_dt > six_months:
+                    time_score = 0.3
+                elif end_dt < now + timedelta(days=30):
+                    time_score = 1.5
+            except (ValueError, TypeError):
+                pass
+
+        score = (vol_24h * time_score) + (competitive * 100000)
+        scored.append((score, ev))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [ev for _, ev in scored[:limit]]

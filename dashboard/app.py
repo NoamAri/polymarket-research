@@ -4,8 +4,10 @@ Category browsing, live event fetching, rich analytics.
 """
 
 import json
+import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -22,6 +24,7 @@ import importlib
 import src.collect.fetch_events
 importlib.reload(src.collect.fetch_events)
 from src.collect.fetch_events import fetch_events_by_category, get_top_categories, fetch_newspaper_events  # noqa: E402
+from src.llm.gemini_writer import get_newspaper_articles  # noqa: E402
 
 # ── Page config ───────────────────────────────────────────────
 st.set_page_config(
@@ -34,7 +37,7 @@ st.set_page_config(
 # ── CSS ───────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700;900&family=Source+Serif+4:wght@400;600&display=swap');
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
 /* Category pill bar */
@@ -157,33 +160,140 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .pnl-lose { color: #fca5a5; font-weight: 500; }
 .pnl-note { color: rgba(255,255,255,0.3); font-size: 0.72rem; font-style: italic; }
 
-/* Newspaper View */
-.news-header {
-    font-size: 2.2rem; font-weight: 800; font-family: 'Georgia', serif;
-    text-align: center; border-bottom: 2px solid #e2e8f0;
-    padding-bottom: 1rem; margin-bottom: 2rem; color: #f8fafc;
-    letter-spacing: -0.02em;
+/* ═══ Newspaper Styles ═══ */
+.np-masthead {
+    text-align: center; padding: 1.5rem 0 1rem 0;
+    border-bottom: 4px double rgba(255,255,255,0.3); margin-bottom: 1.5rem;
 }
-.news-article {
-    background: rgba(255,255,255,0.02);
-    border-left: 3px solid #60a5fa;
-    padding: 1.5rem; margin-bottom: 1.5rem;
-    border-radius: 0 12px 12px 0;
+.np-dateline {
+    font-family: 'Inter', sans-serif; font-size: 0.75rem;
+    color: rgba(255,255,255,0.4); text-transform: uppercase;
+    letter-spacing: 0.15em; margin-bottom: 0.5rem;
 }
-.news-headline {
-    font-size: 1.3rem; font-weight: 700; color: #e2e8f0;
-    margin-bottom: 0.5rem; line-height: 1.4;
+.np-title {
+    font-family: 'Playfair Display', Georgia, serif; font-size: 3rem;
+    font-weight: 900; color: #f8fafc; letter-spacing: 0.05em; line-height: 1.1;
 }
-.news-meta {
-    font-size: 0.8rem; color: #94a3b8; font-weight: 500;
-    margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;
+.np-subtitle {
+    font-family: 'Source Serif 4', Georgia, serif; font-size: 0.95rem;
+    font-style: italic; color: rgba(255,255,255,0.5); margin-top: 0.3rem;
 }
-.news-body {
-    font-size: 1rem; color: #cbd5e1; line-height: 1.6;
+.np-ticker {
+    background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.15);
+    border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1.5rem;
+    overflow-x: auto; white-space: nowrap;
+    font-family: 'Inter', monospace; font-size: 0.8rem; color: #93c5fd;
 }
-.news-odds {
-    margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05);
-    display: flex; gap: 1rem; flex-wrap: wrap;
+.np-ticker span { margin-right: 2rem; }
+.np-ticker .tk-up { color: #86efac; }
+.np-ticker .tk-down { color: #fca5a5; }
+.np-section-head {
+    font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 700;
+    color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.2em;
+    padding: 0.8rem 0 0.5rem 0; border-top: 2px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.06); margin: 2rem 0 1rem 0;
+}
+/* Lead Article */
+.np-lead {
+    padding: 1.5rem 0; margin-bottom: 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.np-lead-section {
+    font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.15em; color: #60a5fa; margin-bottom: 0.5rem;
+}
+.np-lead-headline {
+    font-family: 'Playfair Display', Georgia, serif; font-size: 2.2rem;
+    font-weight: 700; color: #f1f5f9; line-height: 1.2; margin-bottom: 0.6rem;
+}
+.np-lead-byline {
+    font-size: 0.78rem; color: rgba(255,255,255,0.35);
+    margin-bottom: 1rem; font-style: italic;
+}
+.np-lead-body {
+    display: grid; grid-template-columns: 1fr 200px; gap: 1.5rem; align-items: start;
+}
+.np-lead-text {
+    font-family: 'Source Serif 4', Georgia, serif; font-size: 1.05rem;
+    line-height: 1.7; color: #cbd5e1;
+}
+.np-pull-quote {
+    text-align: center; padding: 1.5rem 1rem;
+    border-left: 3px solid #60a5fa; background: rgba(96,165,250,0.05);
+    border-radius: 0 8px 8px 0;
+}
+.np-pq-num {
+    display: block; font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2.5rem; font-weight: 900; color: #60a5fa;
+}
+.np-pq-label {
+    display: block; font-size: 0.8rem; color: rgba(255,255,255,0.5);
+    margin-top: 0.3rem; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.np-lead-stats {
+    font-size: 0.75rem; color: rgba(255,255,255,0.3); margin-top: 1rem;
+}
+.np-odds-bar {
+    display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 1rem;
+}
+/* Standard Article */
+.np-article {
+    background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px; padding: 1.3rem; margin-bottom: 1rem; transition: border-color 0.2s;
+}
+.np-article:hover { border-color: rgba(96,165,250,0.2); }
+.np-art-section {
+    font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.12em; color: #60a5fa; margin-bottom: 0.4rem;
+}
+.np-art-headline {
+    font-family: 'Playfair Display', Georgia, serif; font-size: 1.2rem;
+    font-weight: 700; color: #e2e8f0; line-height: 1.3; margin-bottom: 0.3rem;
+}
+.np-art-byline {
+    font-size: 0.72rem; color: rgba(255,255,255,0.3);
+    font-style: italic; margin-bottom: 0.7rem;
+}
+.np-art-body {
+    font-family: 'Source Serif 4', Georgia, serif; font-size: 0.92rem;
+    line-height: 1.65; color: #94a3b8;
+}
+.np-art-odds {
+    margin-top: 0.8rem; padding-top: 0.6rem;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    display: flex; gap: 0.5rem; flex-wrap: wrap;
+}
+/* Compact Market Watch */
+.np-compact {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 10px; padding: 1rem; margin-bottom: 0.8rem;
+}
+.np-compact-title {
+    font-family: 'Playfair Display', Georgia, serif; font-size: 0.95rem;
+    font-weight: 700; color: #cbd5e1; margin-bottom: 0.4rem; line-height: 1.3;
+}
+.np-compact-odds {
+    font-family: 'Inter', monospace; font-size: 0.82rem; color: #93c5fd;
+}
+.np-compact-vol {
+    font-size: 0.72rem; color: rgba(255,255,255,0.3); margin-top: 0.3rem;
+}
+/* Opinion/Hot Take */
+.np-opinion {
+    border-left: 3px solid #a78bfa; padding: 1rem 1.2rem;
+    margin-bottom: 1rem; background: rgba(167,139,250,0.03);
+}
+.np-opinion-label {
+    font-size: 0.65rem; font-weight: 700; color: #a78bfa;
+    text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 0.3rem;
+}
+.np-opinion-title {
+    font-family: 'Playfair Display', Georgia, serif; font-size: 1.05rem;
+    font-weight: 700; color: #e2e8f0; margin-bottom: 0.4rem;
+}
+.np-opinion-text {
+    font-family: 'Source Serif 4', Georgia, serif; font-size: 0.92rem;
+    font-style: italic; line-height: 1.6; color: #94a3b8;
 }
 
 .section-header {
@@ -424,6 +534,21 @@ with st.sidebar:
         label_visibility="collapsed"
     )
     st.markdown("---")
+
+    # Gemini API key for AI-generated articles
+    gemini_key_env = os.environ.get("GEMINI_API_KEY", "")
+    gemini_api_key = st.text_input(
+        "🔑 Gemini API Key",
+        value=gemini_key_env,
+        type="password",
+        help="Paste your free Gemini API key for AI-generated articles. "
+             "Get one at https://aistudio.google.com/apikey",
+    )
+    if gemini_api_key:
+        st.caption("✨ AI articles enabled")
+    else:
+        st.caption("📝 Template mode (add Gemini key for AI)")
+    st.markdown("---")
     
     if app_mode == "📊 Market Browser":
         st.markdown("### 📡 Data Fetching")
@@ -448,88 +573,222 @@ with st.sidebar:
         st.info("☁️ App is running in the cloud. Static offline dataset is loaded. Fetching is disabled.")
 
 # ══════════════════════════════════════════════════════════════
+# NEWSPAPER HELPERS
+# ══════════════════════════════════════════════════════════════
+
+def _parse_market(mkt: dict):
+    """Return (outcomes_list, prices_list, top_outcome, top_prob) for a market."""
+    outcomes_raw = mkt.get("outcomes", "[]")
+    prices_raw   = mkt.get("outcomePrices", "[]")
+    outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else (outcomes_raw or [])
+    prices   = json.loads(prices_raw)   if isinstance(prices_raw, str)   else (prices_raw or [])
+    top_outcome, top_prob = "", 0.0
+    for o, p in zip(outcomes, prices):
+        try:
+            pf = float(p)
+            if pf > top_prob:
+                top_prob, top_outcome = pf, o
+        except Exception:
+            pass
+    return outcomes, prices, top_outcome, top_prob
+
+
+def _odds_tags_html(outcomes, prices, limit=4) -> str:
+    parts = []
+    for o, p in zip(outcomes[:limit], prices[:limit]):
+        try:
+            pf = float(p)
+            cls = "price-yes" if pf >= 0.5 else "price-no"
+            parts.append(f'<span class="tag {cls}">{o}: {pf:.0%}</span>')
+        except Exception:
+            pass
+    return "".join(parts)
+
+
+def _tag_str(ev: dict) -> str:
+    tags = [t.get("label", "") for t in (ev.get("tags") or [])
+            if t.get("label") and t.get("label") != "All"]
+    return " · ".join(tags[:3]).upper() if tags else "BREAKING"
+
+
+def _reading_time(text: str) -> int:
+    return max(1, round(len(text.split()) / 200))
+
+
+def _render_lead(ev: dict, article_text: str):
+    mkt = ev.get("markets", [{}])[0]
+    outcomes, prices, top_outcome, top_prob = _parse_market(mkt)
+    title    = ev.get("title", "Breaking Market")
+    vol_24h  = float(ev.get("volume24hr", 0) or 0)
+    vol_tot  = float(ev.get("volume", 0) or 0)
+    liq      = float(ev.get("liquidity", 0) or 0)
+    tag_str  = _tag_str(ev)
+    odds_html = _odds_tags_html(outcomes, prices)
+    now_str  = datetime.now().strftime("%I:%M %p")
+    rt       = _reading_time(article_text)
+    pq_num   = f"{top_prob:.0%}" if top_prob else "—"
+
+    st.markdown(f"""
+    <div class="np-lead">
+        <div class="np-lead-section">{tag_str}</div>
+        <div class="np-lead-headline">{title}</div>
+        <div class="np-lead-byline">By Chronicle Markets Desk &bull; {now_str} &bull; {rt} min read</div>
+        <div class="np-lead-body">
+            <div class="np-lead-text">{article_text}</div>
+            <div class="np-pull-quote">
+                <span class="np-pq-num">{pq_num}</span>
+                <span class="np-pq-label">{top_outcome or "Leading odds"}</span>
+            </div>
+        </div>
+        <div class="np-odds-bar">{odds_html}</div>
+        <div class="np-lead-stats">
+            Volume: {format_volume(vol_tot)} &bull; 24h: {format_volume(vol_24h)} &bull; Liquidity: {format_volume(liq)}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def _render_article(ev: dict, article_text: str):
+    mkt = ev.get("markets", [{}])[0]
+    outcomes, prices, _, _ = _parse_market(mkt)
+    title    = ev.get("title", "Breaking Market")
+    tag_str  = _tag_str(ev)
+    odds_html = _odds_tags_html(outcomes, prices)
+    rt       = _reading_time(article_text)
+
+    st.markdown(f"""
+    <div class="np-article">
+        <div class="np-art-section">{tag_str}</div>
+        <div class="np-art-headline">{title}</div>
+        <div class="np-art-byline">Chronicle Staff &bull; {rt} min read</div>
+        <div class="np-art-body">{article_text}</div>
+        <div class="np-art-odds">{odds_html}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def _render_compact(ev: dict):
+    mkt = ev.get("markets", [{}])[0]
+    outcomes, prices, top_outcome, top_prob = _parse_market(mkt)
+    title   = ev.get("title", "Breaking Market")
+    vol_24h = float(ev.get("volume24hr", 0) or 0)
+    odds_parts = []
+    for o, p in zip(outcomes[:2], prices[:2]):
+        try: odds_parts.append(f"{o} {float(p):.0%}")
+        except Exception: pass
+    odds_str = " · ".join(odds_parts) if odds_parts else "—"
+
+    st.markdown(f"""
+    <div class="np-compact">
+        <div class="np-compact-title">{title}</div>
+        <div class="np-compact-odds">{odds_str}</div>
+        <div class="np-compact-vol">24h vol: {format_volume(vol_24h)}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def _render_opinion(ev: dict, article_text: str):
+    title   = ev.get("title", "Breaking Market")
+    tag_str = _tag_str(ev)
+    st.markdown(f"""
+    <div class="np-opinion">
+        <div class="np-opinion-label">HOT TAKE &bull; {tag_str}</div>
+        <div class="np-opinion-title">{title}</div>
+        <div class="np-opinion-text">{article_text}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════════════
 # NEWSPAPER MODE
 # ══════════════════════════════════════════════════════════════
 
 if app_mode == "📰 Live Newspaper":
-    st.markdown('<div class="news-header">The Polymarket Chronicle</div>', unsafe_allow_html=True)
-    st.markdown("*Your real-time feed of the freshest breaking markets across the globe.*")
-    
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown("### 🗞️ Latest Stories")
-    with col2:
-        if st.button("🔄 Refresh Feed", use_container_width=True):
-            st.rerun()
-    import time
-    
-    with st.spinner("Catching up on the news..."):
-        news_events = fetch_newspaper_events(limit=25)
-        
+
+    with st.spinner("Fetching today's markets…"):
+        news_events = fetch_newspaper_events(limit=15)
+
     if not news_events:
         st.info("No fresh news available right now.")
         st.stop()
-        
-    for ev in news_events:
-        title = ev.get("title", "Breaking Market")
-        markets = ev.get("markets", [])
-        if not markets: continue
-        
-        # Pick the most interesting market (usually the first)
-        mkt = markets[0]
-        question = mkt.get("question", "")
-        m_vol = float(mkt.get("volume", 0) or 0)
-        
-        # Format tags
-        tags = [t.get("label", "") for t in (ev.get("tags") or []) if t.get("label") and t.get("label") != "All"]
-        tag_str = " · ".join(tags[:3]).upper() if tags else "BREAKING"
-        
-        # Parse outcomes and prices
-        outcomes_raw = mkt.get("outcomes", "[]")
-        prices_raw = mkt.get("outcomePrices", "[]")
-        outcomes_list = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else (outcomes_raw or [])
-        prices_list = json.loads(prices_raw) if isinstance(prices_raw, str) else (prices_raw or [])
-        
-        # Generate editorial paragraph
-        editorial = ""
-        highest_prob = 0
-        fav_outcome = ""
-        for o, p in zip(outcomes_list, prices_list):
-            try:
-                pf = float(p)
-                if pf > highest_prob:
-                    highest_prob = pf
-                    fav_outcome = o
-            except Exception: pass
-            
-        if highest_prob >= 0.85:
-            editorial = f"The crowd is overwhelmingly confident that {fav_outcome} will happen, giving it a massive {highest_prob:.0%} implied probability right out of the gate."
-        elif highest_prob >= 0.60:
-            editorial = f"Early indicators lean towards {fav_outcome} with a {highest_prob:.0%} chance, but the market is still finding its footing as news develops."
-        elif highest_prob > 0:
-            editorial = f"It is a highly contested toss-up! No single outcome has secured a strong lead, with {fav_outcome} barely edging out the competition at {highest_prob:.0%}."
-        else:
-            editorial = "The market has just opened and odds are highly volatile as traders react to the news."
-            
-        body_text = f"A new market has just surfaced regarding '{title}'. {editorial} Traders have already injected {format_volume(m_vol)} into this market. As the situation unfolds, we will see how these odds shift in real-time."
-        
-        price_tags = []
-        for o, p in zip(outcomes_list[:4], prices_list[:4]):
-            try: price_tags.append(f'<span class="tag">{o}: {float(p):.0%}</span>')
-            except Exception: pass
-        odds_html = f'<div class="news-odds">{"".join(price_tags)}</div>' if price_tags else ""
-        
-        st.markdown(f"""
-        <div class="news-article">
-            <div class="news-meta">{tag_str}</div>
-            <div class="news-headline">{question}</div>
-            <div class="news-body">{body_text}</div>
-            {odds_html}
-        </div>
-        """, unsafe_allow_html=True)
-        
+
+    # Generate articles (single LLM call, cached 15 min)
+    _events_for_llm = [
+        {k: ev.get(k) for k in ("id", "title", "volume", "volume24hr", "liquidity", "tags", "competitive")}
+        | {"markets": ev.get("markets", [])[:1]}
+        for ev in news_events
+    ]
+    with st.spinner("Writing today's edition…"):
+        articles = get_newspaper_articles(
+            json.dumps(_events_for_llm),
+            api_key=gemini_api_key or None,
+        )
+
+    # Masthead
+    today = datetime.now()
+    edition_num = (today - datetime(2025, 1, 1)).days
+    st.markdown(f"""
+    <div class="np-masthead">
+        <div class="np-dateline">{today.strftime("%A, %B %d, %Y")} &mdash; Edition No.&nbsp;{edition_num}</div>
+        <div class="np-title">THE POLYMARKET CHRONICLE</div>
+        <div class="np-subtitle">All the Odds That Are Fit to Print</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Ticker bar
+    ticker_parts = []
+    for ev in news_events[:8]:
+        mkt = ev.get("markets", [{}])[0]
+        _, prices, top_outcome, top_prob = _parse_market(mkt)
+        if top_outcome and top_prob:
+            cls = "tk-up" if top_prob >= 0.6 else "tk-down" if top_prob <= 0.4 else ""
+            ticker_parts.append(
+                f'<span class="{cls}">{ev.get("title","")[:40]} &bull; '
+                f'{top_outcome} {top_prob:.0%}</span>'
+            )
+    if ticker_parts:
+        st.markdown(
+            f'<div class="np-ticker">{"".join(ticker_parts)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # Refresh button
+    if st.button("🔄 Refresh Edition", use_container_width=False):
+        st.cache_data.clear()
+        st.rerun()
+
+    # ── Lead Story ──────────────────────────────────────────
+    lead = news_events[0]
+    _render_lead(lead, articles.get(str(lead.get("id", "")), ""))
+
+    # ── Top Stories (2-col grid) ────────────────────────────
+    top_stories = news_events[1:5]
+    if top_stories:
+        st.markdown('<div class="np-section-head">TOP STORIES</div>', unsafe_allow_html=True)
+        col_a, col_b = st.columns(2)
+        for i, ev in enumerate(top_stories):
+            with (col_a if i % 2 == 0 else col_b):
+                _render_article(ev, articles.get(str(ev.get("id", "")), ""))
+
+    # ── Market Watch (3-col compact) ────────────────────────
+    market_watch = news_events[5:10]
+    if market_watch:
+        st.markdown('<div class="np-section-head">MARKET WATCH</div>', unsafe_allow_html=True)
+        mw_cols = st.columns(3)
+        for i, ev in enumerate(market_watch):
+            with mw_cols[i % 3]:
+                _render_compact(ev)
+
+    # ── Hot Takes (opinion) ─────────────────────────────────
+    hot_takes = news_events[10:]
+    if hot_takes:
+        st.markdown('<div class="np-section-head">HOT TAKES</div>', unsafe_allow_html=True)
+        for ev in hot_takes:
+            _render_opinion(ev, articles.get(str(ev.get("id", "")), ""))
+
     st.markdown("---")
-    st.caption("Auto-generated editorial insights based on real-time API volume and odds.")
+    mode_label = "AI-generated via Gemini" if gemini_api_key else "Template mode — add Gemini key for AI articles"
+    st.caption(f"The Polymarket Chronicle &bull; Live market data &bull; {mode_label}")
     st.stop()
 
 
