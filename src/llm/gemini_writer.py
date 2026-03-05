@@ -58,7 +58,10 @@ Rules:
 - Reference the trading volume to convey market conviction.
 - End with a forward-looking sentence about what to watch.
 - Do NOT use markdown, bullet points, or headers. Plain prose only.
-- Do NOT use emojis."""
+- Do NOT use emojis.
+- For multi-outcome markets (sports, elections, etc.): Name the frontrunner and
+  discuss the competitive field. Mention the top 2-3 contenders by name with
+  their odds. Treat it like a horse race or election poll coverage."""
 
 
 def _format_vol(v: float) -> str:
@@ -71,22 +74,66 @@ def _format_vol(v: float) -> str:
     return f"${v:.0f}"
 
 
-def _build_market_summary(event: dict) -> dict:
-    """Extract a clean summary dict from a raw event for the LLM prompt."""
-    markets = event.get("markets", [])
-    mkt = markets[0] if markets else {}
-
+def _parse_outcomes(mkt: dict) -> tuple:
+    """Parse outcomes and prices from a market dict."""
     outcomes_raw = mkt.get("outcomes", "[]")
     prices_raw = mkt.get("outcomePrices", "[]")
     outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else (outcomes_raw or [])
     prices = json.loads(prices_raw) if isinstance(prices_raw, str) else (prices_raw or [])
+    return outcomes, prices
+
+
+def _is_binary_yesno(outcomes: list) -> bool:
+    """Check if outcomes are standard Yes/No."""
+    if len(outcomes) != 2:
+        return False
+    return {o.strip().lower() for o in outcomes} == {"yes", "no"}
+
+
+def _build_market_summary(event: dict) -> dict:
+    """Extract a clean summary dict from a raw event for the LLM prompt.
+
+    Handles both binary (Yes/No) and multi-outcome markets.
+    For multi-market events (each market = one candidate), aggregates
+    all candidates into a single odds dict.
+    """
+    markets = event.get("markets", [])
+    mkt = markets[0] if markets else {}
+
+    outcomes, prices = _parse_outcomes(mkt)
+    is_binary = _is_binary_yesno(outcomes)
 
     odds = {}
-    for o, p in zip(outcomes, prices):
-        try:
-            odds[o] = round(float(p) * 100, 1)
-        except (ValueError, TypeError):
-            pass
+    market_type = "binary"
+
+    if not is_binary and len(outcomes) > 0:
+        # Single market with named outcomes (not Yes/No)
+        market_type = "multi_outcome"
+        for o, p in zip(outcomes, prices):
+            try:
+                odds[o] = round(float(p) * 100, 1)
+            except (ValueError, TypeError):
+                pass
+    elif len(markets) > 1 and is_binary:
+        # Multi-market event: each sub-market is a candidate with Yes/No
+        market_type = "multi_market"
+        for m in markets:
+            q = m.get("question", "")
+            o_list, p_list = _parse_outcomes(m)
+            for o, p in zip(o_list, p_list):
+                if o.strip().lower() == "yes":
+                    try:
+                        odds[q] = round(float(p) * 100, 1)
+                    except (ValueError, TypeError):
+                        pass
+                    break
+    else:
+        # Standard binary market
+        for o, p in zip(outcomes, prices):
+            try:
+                odds[o] = round(float(p) * 100, 1)
+            except (ValueError, TypeError):
+                pass
 
     tags = [
         t.get("label", "")
@@ -102,6 +149,7 @@ def _build_market_summary(event: dict) -> dict:
         "volume_24h": float(event.get("volume24hr", 0) or 0),
         "tags": tags[:4],
         "num_markets": len(markets),
+        "market_type": market_type,
     }
 
 
@@ -116,6 +164,12 @@ def _build_batch_prompt(summaries: Dict[str, dict]) -> str:
     ]
     for eid, s in summaries.items():
         style = s["style"]
+        mtype = s.get("market_type", "binary")
+        type_note = ""
+        if mtype == "multi_market":
+            type_note = f"\nMarket Type: MULTI-OUTCOME ({s.get('num_markets', '?')} candidates/teams — treat as a race/competition)\n"
+        elif mtype == "multi_outcome":
+            type_note = f"\nMarket Type: MULTI-OUTCOME ({len(s.get('odds', {}))} named outcomes — not Yes/No)\n"
         parts.append(
             f"--- Market ID: {eid} ---\n"
             f"Title: {s['title']}\n"
@@ -124,6 +178,7 @@ def _build_batch_prompt(summaries: Dict[str, dict]) -> str:
             f"24h Volume: ${s['volume_24h']:,.0f}\n"
             f"Total Volume: ${s['volume_total']:,.0f}\n"
             f"Tags: {', '.join(s['tags'])}\n"
+            f"{type_note}"
             f"Style: {style['name']} -- {style['tone']}\n"
             f"Structure: {style['structure']}\n"
         )
@@ -219,10 +274,19 @@ _CLOSERS = [
 ]
 
 
+_MULTI_OPENERS = [
+    "{top} leads the field at {prob}, with {runner_up} trailing at {runner_up_prob} in a market worth {volume}.",
+    "In the race for '{title}', {top} holds the frontrunner position at {prob} while {runner_up} sits at {runner_up_prob}.",
+    "Traders are backing {top} at {prob} in a {n_way} contest that has drawn {volume} in volume, with {runner_up} the closest challenger at {runner_up_prob}.",
+    "The prediction market for '{title}' shows {top} at {prob}, {runner_up} at {runner_up_prob}, in a field of {n_way} contenders worth {volume}.",
+]
+
+
 def _fallback_article(event: dict) -> str:
     """Generate an improved template article when LLM is unavailable."""
     summary = _build_market_summary(event)
     odds = summary["odds"]
+    market_type = summary.get("market_type", "binary")
 
     if not odds:
         return (
@@ -231,9 +295,27 @@ def _fallback_article(event: dict) -> str:
             f"Odds are still forming as early traders take positions."
         )
 
-    top_outcome = max(odds, key=odds.get)
-    top_prob = odds[top_outcome]
+    sorted_outcomes = sorted(odds.items(), key=lambda x: x[1], reverse=True)
+    top_outcome, top_prob = sorted_outcomes[0]
     vol = summary["volume_total"]
+    rng = random.Random(summary["title"])
+
+    # Multi-outcome template (sports, elections, etc.)
+    if market_type in ("multi_market", "multi_outcome") and len(sorted_outcomes) >= 2:
+        runner_up, runner_up_prob = sorted_outcomes[1]
+        opener = rng.choice(_MULTI_OPENERS).format(
+            top=top_outcome,
+            prob=f"{top_prob:.0f}%",
+            runner_up=runner_up,
+            runner_up_prob=f"{runner_up_prob:.0f}%",
+            title=summary["title"],
+            volume=_format_vol(vol),
+            n_way=len(sorted_outcomes),
+        )
+        closer = random.Random(summary["title"] + "c").choice(_CLOSERS)
+        return f"{opener} {closer}"
+
+    # Standard binary template
     vol_desc = (
         "a heavily traded market" if vol > 1_000_000
         else "an active market" if vol > 100_000
@@ -242,7 +324,6 @@ def _fallback_article(event: dict) -> str:
     strength = "commanding" if top_prob > 80 else "moderate" if top_prob > 60 else "narrow"
     consensus = "consensus" if top_prob > 70 else "lean"
 
-    rng = random.Random(summary["title"])
     opener = rng.choice(_OPENERS).format(
         outcome=top_outcome,
         prob=f"{top_prob:.0f}%",

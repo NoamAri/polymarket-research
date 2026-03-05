@@ -17,6 +17,24 @@ import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+# Load .env file if it exists (local dev)
+_env_path = PROJECT_ROOT / ".env"
+if _env_path.exists():
+    for _line in _env_path.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
+
+# Load Streamlit secrets if deployed (Streamlit Cloud)
+try:
+    for _k, _v in st.secrets.items():
+        if isinstance(_v, str):
+            os.environ.setdefault(_k, _v)
+except Exception:
+    pass
+
 import config  # noqa: E402
 
 # Force Streamlit to drop its stale module cache
@@ -146,6 +164,32 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .tag.ended { background: rgba(100,116,139,0.15); color: #94a3b8; }
 .tag.price-yes { background: rgba(34,197,94,0.12); color: #86efac; font-weight: 600; }
 .tag.price-no  { background: rgba(239,68,68,0.12); color: #fca5a5; font-weight: 600; }
+.tag.price-multi { background: rgba(96,165,250,0.12); color: #93c5fd; font-weight: 600; }
+.tag.price-leader { background: rgba(34,197,94,0.15); color: #86efac; font-weight: 700; border: 1px solid rgba(34,197,94,0.2); }
+
+/* Multi-outcome grid in newspaper */
+.np-multi-outcomes {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem; margin-top: 0.8rem;
+}
+.np-multi-outcome {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px; padding: 0.5rem 0.7rem; text-align: center;
+}
+.np-multi-outcome.leader {
+    border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.05);
+}
+.np-multi-name { font-size: 0.82rem; color: #cbd5e1; font-weight: 500; }
+.np-multi-prob { font-size: 1.1rem; font-weight: 700; color: #60a5fa; }
+.np-multi-outcome.leader .np-multi-prob { color: #86efac; }
+
+/* Multi-outcome bar chart in browser */
+.outcome-bar-container { margin: 0.5rem 0; }
+.outcome-bar-row { display: flex; align-items: center; margin-bottom: 0.35rem; gap: 0.5rem; }
+.outcome-bar-label { font-size: 0.82rem; color: #cbd5e1; min-width: 100px; text-align: right; }
+.outcome-bar-track { flex: 1; height: 20px; background: rgba(255,255,255,0.04); border-radius: 4px; overflow: hidden; position: relative; }
+.outcome-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+.outcome-bar-pct { font-size: 0.78rem; color: rgba(255,255,255,0.6); min-width: 40px; }
 
 @keyframes pulse {
     0%, 100% { opacity: 1; }
@@ -464,12 +508,22 @@ def load_markets() -> pd.DataFrame:
         outcomes = row.get("outcomes", [])
         null = {"crowd_win_pct": None, "crowd_lose_pct": None,
                 "est_loser_loss": None, "est_winner_gain": None,
-                "crowd_was_right": None}
+                "crowd_was_right": None, "is_binary_yesno": True}
         if prob is None or vol <= 0 or winner == "Unresolved":
             return pd.Series(null)
         if not isinstance(outcomes, list) or len(outcomes) < 2:
             return pd.Series(null)
-        win_prob  = prob if winner == str(outcomes[0]) else (1 - prob)
+        # Check if this is a standard Yes/No market
+        normed = {str(o).strip().lower() for o in outcomes}
+        is_binary = (normed == {"yes", "no"} and len(outcomes) == 2)
+        if is_binary:
+            win_prob  = prob if winner == str(outcomes[0]) else (1 - prob)
+        else:
+            # For non-binary markets, lastTradePrice is the price of the
+            # winner's "Yes" share. If winner resolved to 1.0, the crowd
+            # was "right" if the price was above 0.5 before resolution.
+            # We use prob directly as the crowd's confidence in this outcome.
+            win_prob = prob
         lose_prob = 1 - win_prob
         return pd.Series({
             "crowd_win_pct":   round(win_prob, 3),
@@ -477,6 +531,7 @@ def load_markets() -> pd.DataFrame:
             "est_loser_loss":  round(lose_prob * vol, 2),
             "est_winner_gain": round(win_prob * vol, 2),
             "crowd_was_right": win_prob >= 0.5,
+            "is_binary_yesno": is_binary,
         })
 
     pnl_df = df.apply(compute_pnl, axis=1)
@@ -535,19 +590,22 @@ with st.sidebar:
     )
     st.markdown("---")
 
-    # Gemini API key for AI-generated articles
-    gemini_key_env = os.environ.get("GEMINI_API_KEY", "")
-    gemini_api_key = st.text_input(
-        "🔑 Gemini API Key",
-        value=gemini_key_env,
+    # Gemini API key: server-side key from env/secrets (hidden), user can override
+    _server_key = os.environ.get("GEMINI_API_KEY", "")
+    user_gemini_key = st.text_input(
+        "🔑 Your Gemini API Key (optional)",
+        value="",
         type="password",
-        help="Paste your free Gemini API key for AI-generated articles. "
-             "Get one at https://aistudio.google.com/apikey",
+        help="Optionally paste your own free Gemini API key for AI-generated articles. "
+             "Get one at https://aistudio.google.com/apikey — "
+             "If left blank, the app uses its built-in key.",
     )
+    gemini_api_key = user_gemini_key or _server_key
     if gemini_api_key:
-        st.caption("✨ AI articles enabled")
+        src = "your key" if user_gemini_key else "built-in"
+        st.caption(f"✨ AI articles enabled ({src})")
     else:
-        st.caption("📝 Template mode (add Gemini key for AI)")
+        st.caption("📝 Template mode (no API key available)")
     st.markdown("---")
     
     if app_mode == "📊 Market Browser":
@@ -593,15 +651,135 @@ def _parse_market(mkt: dict):
     return outcomes, prices, top_outcome, top_prob
 
 
-def _odds_tags_html(outcomes, prices, limit=4) -> str:
+def _is_binary_yesno(outcomes: list) -> bool:
+    """Check if this market has standard Yes/No outcomes."""
+    if len(outcomes) != 2:
+        return False
+    normed = {o.strip().lower() for o in outcomes}
+    return normed == {"yes", "no"}
+
+
+def _is_multi_outcome(ev: dict) -> bool:
+    """Check if an event represents a multi-outcome market (e.g., sports, elections).
+
+    This is true when:
+    - A single market has 3+ outcomes, OR
+    - A single market has 2 named (non-Yes/No) outcomes, OR
+    - The event has multiple markets (each representing a different candidate/team).
+    """
+    markets = ev.get("markets", [])
+    if not markets:
+        return False
+    mkt = markets[0]
+    outcomes, _, _, _ = _parse_market(mkt)
+    # Single market with named outcomes
+    if not _is_binary_yesno(outcomes):
+        return True
+    # Event has multiple sub-markets (each for a different team/candidate)
+    if len(markets) > 1:
+        return True
+    return False
+
+
+def _get_all_outcomes(ev: dict) -> list[tuple[str, float]]:
+    """Get all outcomes with probabilities from an event.
+
+    For multi-market events (e.g., 'Who wins?'), each market represents
+    one candidate/team. We extract the 'Yes' price for each market's question.
+    For single-market events with multiple named outcomes, we use those directly.
+    """
+    markets = ev.get("markets", [])
+    if not markets:
+        return []
+
+    mkt = markets[0]
+    outcomes, prices, _, _ = _parse_market(mkt)
+
+    # Single market with named outcomes (not Yes/No)
+    if not _is_binary_yesno(outcomes):
+        result = []
+        for o, p in zip(outcomes, prices):
+            try:
+                result.append((str(o), float(p)))
+            except (ValueError, TypeError):
+                pass
+        return sorted(result, key=lambda x: x[1], reverse=True)
+
+    # Multi-market event: each sub-market has a question = candidate name
+    if len(markets) > 1:
+        result = []
+        for m in markets:
+            q = m.get("question", "")
+            o_list, p_list, _, _ = _parse_market(m)
+            # Find the "Yes" price
+            yes_price = 0.0
+            for o, p in zip(o_list, p_list):
+                if o.strip().lower() == "yes":
+                    try:
+                        yes_price = float(p)
+                    except (ValueError, TypeError):
+                        pass
+                    break
+            if q:
+                result.append((q, yes_price))
+        return sorted(result, key=lambda x: x[1], reverse=True)
+
+    # Standard binary market
+    result = []
+    for o, p in zip(outcomes, prices):
+        try:
+            result.append((str(o), float(p)))
+        except (ValueError, TypeError):
+            pass
+    return result
+
+
+def _odds_tags_html(outcomes, prices, limit=4, is_multi=False) -> str:
     parts = []
-    for o, p in zip(outcomes[:limit], prices[:limit]):
+    # Sort by price descending for multi-outcome
+    pairs = list(zip(outcomes, prices))
+    if is_multi and len(pairs) > 2:
+        try:
+            pairs.sort(key=lambda x: float(x[1]), reverse=True)
+        except (ValueError, TypeError):
+            pass
+
+    for i, (o, p) in enumerate(pairs[:limit]):
         try:
             pf = float(p)
-            cls = "price-yes" if pf >= 0.5 else "price-no"
+            if is_multi:
+                cls = "price-leader" if i == 0 and pf > 0.2 else "price-multi"
+            else:
+                cls = "price-yes" if pf >= 0.5 else "price-no"
             parts.append(f'<span class="tag {cls}">{o}: {pf:.0%}</span>')
         except Exception:
             pass
+    if is_multi and len(pairs) > limit:
+        parts.append(f'<span class="tag">+{len(pairs) - limit} more</span>')
+    return "".join(parts)
+
+
+def _multi_outcomes_html(all_outcomes: list[tuple[str, float]], limit=8) -> str:
+    """Render a grid of outcome cards for multi-outcome markets."""
+    if not all_outcomes:
+        return ""
+    parts = ['<div class="np-multi-outcomes">']
+    for i, (name, prob) in enumerate(all_outcomes[:limit]):
+        cls = "leader" if i == 0 and prob > 0.1 else ""
+        parts.append(
+            f'<div class="np-multi-outcome {cls}">'
+            f'<div class="np-multi-name">{name}</div>'
+            f'<div class="np-multi-prob">{prob:.0%}</div>'
+            f'</div>'
+        )
+    if len(all_outcomes) > limit:
+        parts.append(
+            f'<div class="np-multi-outcome">'
+            f'<div class="np-multi-name">+{len(all_outcomes) - limit} more</div>'
+            f'<div class="np-multi-prob">...</div>'
+            f'</div>'
+        )
+    parts.append('</div>')
     return "".join(parts)
 
 
@@ -623,24 +801,40 @@ def _render_lead(ev: dict, article_text: str):
     vol_tot  = float(ev.get("volume", 0) or 0)
     liq      = float(ev.get("liquidity", 0) or 0)
     tag_str  = _tag_str(ev)
-    odds_html = _odds_tags_html(outcomes, prices)
+    multi    = _is_multi_outcome(ev)
     now_str  = datetime.now().strftime("%I:%M %p")
     rt       = _reading_time(article_text)
-    pq_num   = f"{top_prob:.0%}" if top_prob else "—"
+
+    if multi:
+        all_outcomes = _get_all_outcomes(ev)
+        top_name = all_outcomes[0][0] if all_outcomes else "—"
+        top_pct  = f"{all_outcomes[0][1]:.0%}" if all_outcomes else "—"
+        pq_num   = top_pct
+        pq_label = top_name
+        n_markets = len(ev.get("markets", []))
+        market_type_label = f"{n_markets} outcomes" if n_markets > 1 else f"{len(outcomes)} outcomes"
+        odds_section = _multi_outcomes_html(all_outcomes, limit=6)
+    else:
+        pq_num   = f"{top_prob:.0%}" if top_prob else "—"
+        pq_label = top_outcome or "Leading odds"
+        market_type_label = ""
+        odds_section = f'<div class="np-odds-bar">{_odds_tags_html(outcomes, prices)}</div>'
+
+    type_badge = f' &bull; <span class="tag price-multi">{market_type_label}</span>' if market_type_label else ""
 
     st.markdown(f"""
     <div class="np-lead">
-        <div class="np-lead-section">{tag_str}</div>
+        <div class="np-lead-section">{tag_str}{type_badge}</div>
         <div class="np-lead-headline">{title}</div>
         <div class="np-lead-byline">By Chronicle Markets Desk &bull; {now_str} &bull; {rt} min read</div>
         <div class="np-lead-body">
             <div class="np-lead-text">{article_text}</div>
             <div class="np-pull-quote">
                 <span class="np-pq-num">{pq_num}</span>
-                <span class="np-pq-label">{top_outcome or "Leading odds"}</span>
+                <span class="np-pq-label">{pq_label}</span>
             </div>
         </div>
-        <div class="np-odds-bar">{odds_html}</div>
+        {odds_section}
         <div class="np-lead-stats">
             Volume: {format_volume(vol_tot)} &bull; 24h: {format_volume(vol_24h)} &bull; Liquidity: {format_volume(liq)}
         </div>
@@ -653,8 +847,14 @@ def _render_article(ev: dict, article_text: str):
     outcomes, prices, _, _ = _parse_market(mkt)
     title    = ev.get("title", "Breaking Market")
     tag_str  = _tag_str(ev)
-    odds_html = _odds_tags_html(outcomes, prices)
+    multi    = _is_multi_outcome(ev)
     rt       = _reading_time(article_text)
+
+    if multi:
+        all_outcomes = _get_all_outcomes(ev)
+        odds_html = _multi_outcomes_html(all_outcomes, limit=4)
+    else:
+        odds_html = f'<div class="np-art-odds">{_odds_tags_html(outcomes, prices)}</div>'
 
     st.markdown(f"""
     <div class="np-article">
@@ -662,7 +862,7 @@ def _render_article(ev: dict, article_text: str):
         <div class="np-art-headline">{title}</div>
         <div class="np-art-byline">Chronicle Staff &bull; {rt} min read</div>
         <div class="np-art-body">{article_text}</div>
-        <div class="np-art-odds">{odds_html}</div>
+        {odds_html}
     </div>
     """, unsafe_allow_html=True)
 
@@ -672,11 +872,21 @@ def _render_compact(ev: dict):
     outcomes, prices, top_outcome, top_prob = _parse_market(mkt)
     title   = ev.get("title", "Breaking Market")
     vol_24h = float(ev.get("volume24hr", 0) or 0)
-    odds_parts = []
-    for o, p in zip(outcomes[:2], prices[:2]):
-        try: odds_parts.append(f"{o} {float(p):.0%}")
-        except Exception: pass
-    odds_str = " · ".join(odds_parts) if odds_parts else "—"
+    multi   = _is_multi_outcome(ev)
+
+    if multi:
+        all_outcomes = _get_all_outcomes(ev)
+        # Show top 3 for compact view
+        odds_parts = [f"{name} {prob:.0%}" for name, prob in all_outcomes[:3]]
+        odds_str = " · ".join(odds_parts) if odds_parts else "—"
+        if len(all_outcomes) > 3:
+            odds_str += f" +{len(all_outcomes) - 3}"
+    else:
+        odds_parts = []
+        for o, p in zip(outcomes[:2], prices[:2]):
+            try: odds_parts.append(f"{o} {float(p):.0%}")
+            except Exception: pass
+        odds_str = " · ".join(odds_parts) if odds_parts else "—"
 
     st.markdown(f"""
     <div class="np-compact">
@@ -713,11 +923,15 @@ if app_mode == "📰 Live Newspaper":
         st.stop()
 
     # Generate articles (single LLM call, cached 15 min)
-    _events_for_llm = [
-        {k: ev.get(k) for k in ("id", "title", "volume", "volume24hr", "liquidity", "tags", "competitive")}
-        | {"markets": ev.get("markets", [])[:1]}
-        for ev in news_events
-    ]
+    # For multi-outcome events, include more markets so the LLM sees all candidates
+    _events_for_llm = []
+    for ev in news_events:
+        base = {k: ev.get(k) for k in ("id", "title", "volume", "volume24hr", "liquidity", "tags", "competitive")}
+        if _is_multi_outcome(ev):
+            base["markets"] = ev.get("markets", [])[:10]  # include up to 10 sub-markets
+        else:
+            base["markets"] = ev.get("markets", [])[:1]
+        _events_for_llm.append(base)
     with st.spinner("Writing today's edition…"):
         articles = get_newspaper_articles(
             json.dumps(_events_for_llm),
@@ -738,14 +952,25 @@ if app_mode == "📰 Live Newspaper":
     # Ticker bar
     ticker_parts = []
     for ev in news_events[:8]:
-        mkt = ev.get("markets", [{}])[0]
-        _, prices, top_outcome, top_prob = _parse_market(mkt)
-        if top_outcome and top_prob:
-            cls = "tk-up" if top_prob >= 0.6 else "tk-down" if top_prob <= 0.4 else ""
-            ticker_parts.append(
-                f'<span class="{cls}">{ev.get("title","")[:40]} &bull; '
-                f'{top_outcome} {top_prob:.0%}</span>'
-            )
+        multi = _is_multi_outcome(ev)
+        if multi:
+            all_outcomes = _get_all_outcomes(ev)
+            if all_outcomes:
+                name, prob = all_outcomes[0]
+                cls = "tk-up" if prob >= 0.3 else ""
+                ticker_parts.append(
+                    f'<span class="{cls}">{ev.get("title","")[:30]} &bull; '
+                    f'{name[:20]} {prob:.0%}</span>'
+                )
+        else:
+            mkt = ev.get("markets", [{}])[0]
+            _, prices, top_outcome, top_prob = _parse_market(mkt)
+            if top_outcome and top_prob:
+                cls = "tk-up" if top_prob >= 0.6 else "tk-down" if top_prob <= 0.4 else ""
+                ticker_parts.append(
+                    f'<span class="{cls}">{ev.get("title","")[:40]} &bull; '
+                    f'{top_outcome} {top_prob:.0%}</span>'
+                )
     if ticker_parts:
         st.markdown(
             f'<div class="np-ticker">{"".join(ticker_parts)}</div>',
@@ -917,11 +1142,18 @@ if selected_slug is not None:
     from datetime import datetime
     from src.collect.fetch_events import fetch_price_history
 
+    # Color palette for multi-outcome charts
+    MULTI_COLORS = [
+        "#60a5fa", "#86efac", "#fca5a5", "#fcd34d", "#c4b5fd",
+        "#f9a8d4", "#67e8f9", "#fdba74", "#a5b4fc", "#6ee7b7",
+    ]
+
     for ev_idx, ev in enumerate(filtered_events[:end]):
         title = ev.get("title", "Untitled Event")
         ev_vol = float(ev.get("volume", 0) or 0)
         is_closed = ev.get("closed", True)
         markets = ev.get("markets", [])
+        multi = _is_multi_outcome(ev)
 
         status_tag = ('⚫ Resolved' if is_closed else '🟢 Live')
         vol_str = format_volume(ev_vol)
@@ -934,6 +1166,13 @@ if selected_slug is not None:
             if lbl and lbl != "All":
                 ev_tag_labels.append(lbl)
 
+        # Multi-outcome badge
+        multi_badge = ""
+        if multi:
+            all_ev_outcomes = _get_all_outcomes(ev)
+            n_outcomes = len(all_ev_outcomes)
+            multi_badge = f'<span class="tag price-multi">🎯 {n_outcomes} outcomes</span>'
+
         # Event header as HTML
         ev_tags_html = " ".join(f'<span class="tag">{t}</span>' for t in ev_tag_labels)
         status_cls = "ended" if is_closed else "live"
@@ -944,11 +1183,38 @@ if selected_slug is not None:
             f'    <span class="tag {status_cls}">{status_tag}</span>'
             f'    <span class="tag vol">💰 {vol_str}</span>'
             f'    <span class="tag">{n_markets} market{"s" if n_markets!=1 else ""}</span>'
+            f'    {multi_badge}'
             f'  </div>'
             f'  <div class="event-tags">{ev_tags_html}</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
+
+        # ── Multi-outcome overview panel ──────────────────────
+        if multi and n_markets > 1:
+            all_ev_outcomes = _get_all_outcomes(ev)
+            if all_ev_outcomes:
+                with st.expander(f"📊 All Outcomes Overview — {len(all_ev_outcomes)} candidates", expanded=False):
+                    # Horizontal bar chart of all outcomes
+                    bar_html_parts = ['<div class="outcome-bar-container">']
+                    max_prob = max((p for _, p in all_ev_outcomes), default=1) or 1
+                    for i, (name, prob) in enumerate(all_ev_outcomes[:20]):
+                        color = MULTI_COLORS[i % len(MULTI_COLORS)]
+                        width_pct = (prob / max_prob) * 100 if max_prob > 0 else 0
+                        bar_html_parts.append(
+                            f'<div class="outcome-bar-row">'
+                            f'<div class="outcome-bar-label">{name[:30]}</div>'
+                            f'<div class="outcome-bar-track">'
+                            f'<div class="outcome-bar-fill" style="width:{width_pct:.0f}%;background:{color};"></div>'
+                            f'</div>'
+                            f'<div class="outcome-bar-pct">{prob:.0%}</div>'
+                            f'</div>'
+                        )
+                    bar_html_parts.append('</div>')
+                    st.markdown("".join(bar_html_parts), unsafe_allow_html=True)
+
+                    if not is_closed:
+                        st.caption("Probabilities represent the current 'Yes' price for each candidate's market")
 
         # Sort markets: active first, then by volume
         sorted_markets = sorted(
@@ -974,6 +1240,8 @@ if selected_slug is not None:
                 except Exception: prices_list = []
             else:
                 prices_list = prices_raw or []
+
+            is_binary = _is_binary_yesno(outcomes_list)
 
             # Parse clobTokenIds
             clob_raw = mkt.get("clobTokenIds", "[]")
@@ -1053,18 +1321,17 @@ if selected_slug is not None:
                     # ━━━━━━━ RESOLVED MARKET: DETAIL PANEL ━━━━━━━
                     winner = None
                     winner_price = 0
-                    loser_outcomes = []
+                    all_resolved = []
                     for o, p in zip(outcomes_list, prices_list):
                         try:
                             pf = float(p)
                             if pf >= 0.99:
                                 winner = str(o)
                                 winner_price = pf
-                            else:
-                                loser_outcomes.append((str(o), pf))
+                            all_resolved.append((str(o), pf))
                         except Exception: pass
 
-                    # P&L estimates
+                    # Header metrics
                     det_cols = st.columns([1, 1, 1])
                     with det_cols[0]:
                         st.metric("🏆 Winner", winner or "Unknown")
@@ -1085,13 +1352,20 @@ if selected_slug is not None:
                         else:
                             st.metric("⏱️ Duration", "—")
 
-                    # Estimated P&L
+                    # Show all resolved outcomes for non-binary markets
+                    if not is_binary and len(all_resolved) > 0:
+                        st.markdown("**Final Resolution:**")
+                        for o_name, o_price in all_resolved:
+                            icon = "🏆" if o_price >= 0.99 else "❌"
+                            st.markdown(f"- {icon} **{o_name}**: {o_price:.0%}")
+
+                    # Estimated P&L — only reliable for binary markets
                     ltp = mkt.get("lastTradePrice")
                     try: ltp_f = float(ltp) if ltp else None
                     except Exception: ltp_f = None
 
-                    if ltp_f and 0.05 < ltp_f < 0.95 and m_vol > 0 and winner:
-                        # Compute win_prob for the winner side
+                    if is_binary and ltp_f and 0.05 < ltp_f < 0.95 and m_vol > 0 and winner:
+                        # Binary P&L: use lastTradePrice
                         if winner == str(outcomes_list[0]) if outcomes_list else False:
                             win_prob = ltp_f
                         else:
@@ -1116,44 +1390,68 @@ if selected_slug is not None:
                         else:
                             eff_label = "🔴 Upset! — crowd got it wrong"
                         st.markdown(f"**Market efficiency**: {eff_label} ({efficiency:.0f}% on winner)")
+                    elif not is_binary:
+                        st.caption("💡 P&L breakdown not available for multi-outcome markets — requires trade-level data.")
                     else:
-                        st.info("💸 P&L estimates unavailable — last trade price was post-resolution. Trade-level data (Step 3) needed for exact figures.")
+                        st.info("💸 P&L estimates unavailable — last trade price was post-resolution.")
 
-                    # Price history chart
+                    # Price history chart — show all outcomes for multi-outcome
                     if clob_tokens:
                         with st.spinner("Loading price history…"):
                             history = fetch_price_history(clob_tokens[0])
 
                         if history and len(history) > 2:
                             st.markdown("#### 📈 Price History — Odds Over Time")
+                            fig_h = go.Figure()
+
+                            # First outcome
                             times = [datetime.fromtimestamp(h["t"]) for h in history]
-                            prices = [float(h["p"]) for h in history]
+                            prices_hist = [float(h["p"]) for h in history]
                             outcome_label = outcomes_list[0] if outcomes_list else "Outcome 1"
 
-                            fig_h = go.Figure()
                             fig_h.add_trace(go.Scatter(
-                                x=times, y=prices,
+                                x=times, y=prices_hist,
                                 mode="lines",
-                                fill="tozeroy",
-                                line=dict(color="#60a5fa", width=2),
-                                fillcolor="rgba(96,165,250,0.1)",
+                                fill="tozeroy" if is_binary else None,
+                                line=dict(color=MULTI_COLORS[0], width=2),
+                                fillcolor="rgba(96,165,250,0.1)" if is_binary else None,
                                 name=outcome_label,
                             ))
-                            # Add resolution line
-                            if winner == outcome_label:
-                                fig_h.add_hline(y=1.0, line_dash="dot",
-                                                line_color="rgba(34,197,94,0.5)",
-                                                annotation_text="Resolved ✓")
-                            else:
-                                fig_h.add_hline(y=0.0, line_dash="dot",
-                                                line_color="rgba(239,68,68,0.5)",
-                                                annotation_text="Resolved ✗")
+
+                            # For multi-outcome: try to load additional token histories
+                            if not is_binary and len(clob_tokens) > 1:
+                                for tok_idx, tok in enumerate(clob_tokens[1:4], start=1):  # up to 4 outcomes
+                                    extra_hist = fetch_price_history(tok)
+                                    if extra_hist and len(extra_hist) > 2:
+                                        t2 = [datetime.fromtimestamp(h["t"]) for h in extra_hist]
+                                        p2 = [float(h["p"]) for h in extra_hist]
+                                        o_label = outcomes_list[tok_idx] if tok_idx < len(outcomes_list) else f"Outcome {tok_idx+1}"
+                                        fig_h.add_trace(go.Scatter(
+                                            x=t2, y=p2,
+                                            mode="lines",
+                                            line=dict(color=MULTI_COLORS[tok_idx % len(MULTI_COLORS)], width=2),
+                                            name=o_label,
+                                        ))
+
+                            # Add resolution line for binary markets
+                            if is_binary and m_closed:
+                                if winner == outcome_label:
+                                    fig_h.add_hline(y=1.0, line_dash="dot",
+                                                    line_color="rgba(34,197,94,0.5)",
+                                                    annotation_text="Resolved ✓")
+                                else:
+                                    fig_h.add_hline(y=0.0, line_dash="dot",
+                                                    line_color="rgba(239,68,68,0.5)",
+                                                    annotation_text="Resolved ✗")
+
+                            chart_title = f"Price of \"{outcome_label}\" over time" if is_binary else "Outcome Prices Over Time"
                             fig_h.update_layout(
                                 **CHART_LAYOUT,
-                                title=f"Price of \"{outcome_label}\" over time",
+                                title=chart_title,
                                 xaxis_title="Date",
                                 yaxis_title="Price ($)",
                                 height=300,
+                                showlegend=not is_binary,
                             )
                             fig_h.update_yaxes(range=[0, 1.05], gridcolor="rgba(255,255,255,0.05)")
                             st.plotly_chart(fig_h, use_container_width=True)
@@ -1295,8 +1593,12 @@ with ch1:
     top15 = (filtered.nlargest(15, "volume")
              [["question", "volume", "resolved_winner"]].copy())
     top15["short_q"] = top15["question"].str[:55] + "…"
-    top15["color"]   = top15["resolved_winner"].apply(
-        lambda w: "#86efac" if w == "Yes" else ("#fca5a5" if w == "No" else "#93c5fd"))
+    def _winner_color(w):
+        if w == "Yes": return "#86efac"      # green — Yes won
+        if w == "No": return "#fca5a5"       # red — No won
+        if w == "Unresolved": return "#93c5fd"  # blue — not resolved
+        return "#c4b5fd"  # purple — named winner (team/candidate)
+    top15["color"]   = top15["resolved_winner"].apply(_winner_color)
     fig_top = go.Figure(go.Bar(
         x=top15["volume"], y=top15["short_q"], orientation="h",
         marker_color=top15["color"],
@@ -1430,7 +1732,13 @@ with ch6:
                 outcomes = row.get("outcomes", [])
                 if not isinstance(outcomes, list) or len(outcomes) < 2:
                     return prob
-                return prob if winner == str(outcomes[0]) else (1 - prob)
+                # For binary Yes/No: if winner == first outcome, prob is right, else 1-prob
+                normed = {str(o).strip().lower() for o in outcomes}
+                if normed == {"yes", "no"} and len(outcomes) == 2:
+                    return prob if winner == str(outcomes[0]) else (1 - prob)
+                # For non-binary: prob represents the price of this specific outcome
+                # The winner's price should have been high = crowd was right
+                return prob
 
             eff_df["efficiency"] = eff_df.apply(get_efficiency, axis=1)
             eff_df["eff_pct"] = eff_df["efficiency"] * 100
@@ -1464,10 +1772,13 @@ st.caption(f"Showing 1–{end_idx} of {total:,} markets")
 
 for _, row in page_df.iterrows():
     winner = row.get("resolved_winner", "Unresolved")
-    winner_cls = "win" if winner not in ("Unresolved", "No") else "lose"
-    winner_html = (f'<span class="tag {winner_cls}">🏆 {winner}</span>'
-                   if winner != "Unresolved"
-                   else '<span class="tag">❓ Unresolved</span>')
+    if winner == "Unresolved":
+        winner_html = '<span class="tag">❓ Unresolved</span>'
+    elif winner == "No":
+        winner_html = f'<span class="tag lose">🏆 {winner}</span>'
+    else:
+        # "Yes" or any named winner (team/candidate) — show as win
+        winner_html = f'<span class="tag win">🏆 {winner}</span>'
     vol_html = f'<span class="tag vol">💰 {format_volume(row["volume"])}</span>'
     dur = row.get("duration_days")
     dur_html = f'<span class="tag dur">⏱️ {int(dur)}d</span>' if pd.notna(dur) and dur > 0 else ""
