@@ -164,24 +164,45 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .tag.ended { background: rgba(100,116,139,0.15); color: #94a3b8; }
 .tag.price-yes { background: rgba(34,197,94,0.12); color: #86efac; font-weight: 600; }
 .tag.price-no  { background: rgba(239,68,68,0.12); color: #fca5a5; font-weight: 600; }
-.tag.price-multi { background: rgba(96,165,250,0.12); color: #93c5fd; font-weight: 600; }
-.tag.price-leader { background: rgba(34,197,94,0.15); color: #86efac; font-weight: 700; border: 1px solid rgba(34,197,94,0.2); }
+.tag.price-multi { background: rgba(96,165,250,0.12); color: #93c5fd; font-weight: 600; font-size: 0.78rem; }
+.tag.price-leader {
+    background: linear-gradient(135deg, rgba(34,197,94,0.18), rgba(34,197,94,0.08));
+    color: #86efac; font-weight: 700;
+    border: 1px solid rgba(34,197,94,0.25);
+    box-shadow: 0 1px 4px rgba(34,197,94,0.1);
+    font-size: 0.78rem;
+}
 
 /* Multi-outcome grid in newspaper */
 .np-multi-outcomes {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.5rem; margin-top: 0.8rem;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 0.6rem; margin-top: 1rem;
 }
 .np-multi-outcome {
-    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 8px; padding: 0.5rem 0.7rem; text-align: center;
+    background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px; padding: 0.6rem 0.8rem; text-align: center;
+    transition: border-color 0.2s, transform 0.2s;
+}
+.np-multi-outcome:hover {
+    border-color: rgba(96,165,250,0.2);
+    transform: translateY(-1px);
 }
 .np-multi-outcome.leader {
-    border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.05);
+    border-color: rgba(34,197,94,0.35);
+    background: linear-gradient(135deg, rgba(34,197,94,0.06), rgba(34,197,94,0.02));
+    box-shadow: 0 2px 8px rgba(34,197,94,0.08);
 }
-.np-multi-name { font-size: 0.82rem; color: #cbd5e1; font-weight: 500; }
-.np-multi-prob { font-size: 1.1rem; font-weight: 700; color: #60a5fa; }
-.np-multi-outcome.leader .np-multi-prob { color: #86efac; }
+.np-multi-name { font-size: 0.82rem; color: #d1d5db; font-weight: 500; }
+.np-multi-prob {
+    font-size: 1.15rem; font-weight: 700;
+    background: linear-gradient(135deg, #60a5fa, #93c5fd);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.np-multi-outcome.leader .np-multi-prob {
+    background: linear-gradient(135deg, #4ade80, #86efac);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
 
 /* Multi-outcome bar chart in browser */
 .outcome-bar-container { margin: 0.5rem 0; }
@@ -190,6 +211,9 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .outcome-bar-track { flex: 1; height: 20px; background: rgba(255,255,255,0.04); border-radius: 4px; overflow: hidden; position: relative; }
 .outcome-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
 .outcome-bar-pct { font-size: 0.78rem; color: rgba(255,255,255,0.6); min-width: 40px; }
+
+/* Team logos inline */
+.team-logo { height: 22px; width: 22px; vertical-align: middle; margin-right: 4px; object-fit: contain; display: inline-block; border-radius: 2px; }
 
 @keyframes pulse {
     0%, 100% { opacity: 1; }
@@ -206,138 +230,196 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
 /* ═══ Newspaper Styles ═══ */
 .np-masthead {
-    text-align: center; padding: 1.5rem 0 1rem 0;
-    border-bottom: 4px double rgba(255,255,255,0.3); margin-bottom: 1.5rem;
+    text-align: center; padding: 2.5rem 0 1.5rem 0;
+    border-bottom: 3px solid rgba(96,165,250,0.3);
+    margin-bottom: 2rem;
+    background: linear-gradient(180deg, rgba(96,165,250,0.04) 0%, transparent 100%);
 }
 .np-dateline {
-    font-family: 'Inter', sans-serif; font-size: 0.75rem;
-    color: rgba(255,255,255,0.4); text-transform: uppercase;
-    letter-spacing: 0.15em; margin-bottom: 0.5rem;
+    font-family: 'Inter', sans-serif; font-size: 0.72rem;
+    color: rgba(255,255,255,0.45); text-transform: uppercase;
+    letter-spacing: 0.2em; margin-bottom: 0.6rem;
 }
 .np-title {
-    font-family: 'Playfair Display', Georgia, serif; font-size: 3rem;
-    font-weight: 900; color: #f8fafc; letter-spacing: 0.05em; line-height: 1.1;
+    font-family: 'Playfair Display', Georgia, serif; font-size: 3.2rem;
+    font-weight: 900; letter-spacing: 0.06em; line-height: 1.1;
+    background: linear-gradient(135deg, #f8fafc 0%, #93c5fd 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .np-subtitle {
     font-family: 'Source Serif 4', Georgia, serif; font-size: 0.95rem;
-    font-style: italic; color: rgba(255,255,255,0.5); margin-top: 0.3rem;
+    font-style: italic; color: rgba(255,255,255,0.45); margin-top: 0.4rem;
 }
 .np-ticker {
-    background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.15);
-    border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1.5rem;
+    background: linear-gradient(90deg, rgba(96,165,250,0.06), rgba(167,139,250,0.06));
+    border: 1px solid rgba(96,165,250,0.12);
+    border-radius: 10px; padding: 0.7rem 1.2rem; margin-bottom: 2rem;
     overflow-x: auto; white-space: nowrap;
-    font-family: 'Inter', monospace; font-size: 0.8rem; color: #93c5fd;
+    font-family: 'Inter', monospace; font-size: 0.78rem; color: #93c5fd;
 }
-.np-ticker span { margin-right: 2rem; }
-.np-ticker .tk-up { color: #86efac; }
+.np-ticker span { margin-right: 2.5rem; }
+.np-ticker .tk-up { color: #86efac; font-weight: 600; }
 .np-ticker .tk-down { color: #fca5a5; }
 .np-section-head {
-    font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 700;
-    color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.2em;
-    padding: 0.8rem 0 0.5rem 0; border-top: 2px solid rgba(255,255,255,0.1);
-    border-bottom: 1px solid rgba(255,255,255,0.06); margin: 2rem 0 1rem 0;
+    font-family: 'Inter', sans-serif; font-size: 0.78rem; font-weight: 700;
+    color: #60a5fa; text-transform: uppercase; letter-spacing: 0.25em;
+    padding: 0.6rem 0 0.5rem 0;
+    border-top: 2px solid rgba(96,165,250,0.2);
+    margin: 2.5rem 0 1.2rem 0;
+    display: flex; align-items: center; gap: 0.6rem;
 }
+.np-section-head::after {
+    content: ""; flex: 1; height: 1px;
+    background: linear-gradient(90deg, rgba(96,165,250,0.15), transparent);
+}
+
 /* Lead Article */
 .np-lead {
-    padding: 1.5rem 0; margin-bottom: 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 2rem 0; margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .np-lead-section {
-    font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.15em; color: #60a5fa; margin-bottom: 0.5rem;
+    font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.18em;
+    color: #60a5fa; margin-bottom: 0.6rem;
+    display: flex; align-items: center; gap: 0.5rem;
 }
 .np-lead-headline {
-    font-family: 'Playfair Display', Georgia, serif; font-size: 2.2rem;
-    font-weight: 700; color: #f1f5f9; line-height: 1.2; margin-bottom: 0.6rem;
+    font-family: 'Playfair Display', Georgia, serif; font-size: 2.4rem;
+    font-weight: 700; color: #f1f5f9; line-height: 1.15; margin-bottom: 0.7rem;
 }
 .np-lead-byline {
-    font-size: 0.78rem; color: rgba(255,255,255,0.35);
-    margin-bottom: 1rem; font-style: italic;
+    font-size: 0.76rem; color: rgba(255,255,255,0.3);
+    margin-bottom: 1.2rem; font-style: italic;
 }
 .np-lead-body {
-    display: grid; grid-template-columns: 1fr 200px; gap: 1.5rem; align-items: start;
+    display: grid; grid-template-columns: 1fr 220px; gap: 2rem; align-items: start;
 }
 .np-lead-text {
-    font-family: 'Source Serif 4', Georgia, serif; font-size: 1.05rem;
-    line-height: 1.7; color: #cbd5e1;
+    font-family: 'Source Serif 4', Georgia, serif; font-size: 1.08rem;
+    line-height: 1.75; color: #d1d5db;
 }
 .np-pull-quote {
-    text-align: center; padding: 1.5rem 1rem;
-    border-left: 3px solid #60a5fa; background: rgba(96,165,250,0.05);
-    border-radius: 0 8px 8px 0;
+    text-align: center; padding: 1.8rem 1rem;
+    border-left: 3px solid #60a5fa;
+    background: linear-gradient(135deg, rgba(96,165,250,0.06), rgba(96,165,250,0.02));
+    border-radius: 0 12px 12px 0;
 }
 .np-pq-num {
     display: block; font-family: 'Playfair Display', Georgia, serif;
-    font-size: 2.5rem; font-weight: 900; color: #60a5fa;
+    font-size: 3rem; font-weight: 900;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .np-pq-label {
-    display: block; font-size: 0.8rem; color: rgba(255,255,255,0.5);
-    margin-top: 0.3rem; text-transform: uppercase; letter-spacing: 0.05em;
+    display: block; font-size: 0.78rem; color: rgba(255,255,255,0.5);
+    margin-top: 0.4rem; text-transform: uppercase; letter-spacing: 0.06em;
+    font-weight: 500;
 }
 .np-lead-stats {
-    font-size: 0.75rem; color: rgba(255,255,255,0.3); margin-top: 1rem;
+    font-size: 0.74rem; color: rgba(255,255,255,0.25); margin-top: 1.2rem;
+    font-family: 'Inter', monospace;
 }
 .np-odds-bar {
     display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 1rem;
 }
+
 /* Standard Article */
 .np-article {
-    background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 12px; padding: 1.3rem; margin-bottom: 1rem; transition: border-color 0.2s;
+    background: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005));
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px; padding: 1.5rem; margin-bottom: 1.2rem;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
 }
-.np-article:hover { border-color: rgba(96,165,250,0.2); }
+.np-article:hover {
+    border-color: rgba(96,165,250,0.25);
+    box-shadow: 0 4px 20px rgba(96,165,250,0.06);
+    transform: translateY(-1px);
+}
 .np-art-section {
-    font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.12em; color: #60a5fa; margin-bottom: 0.4rem;
+    font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.15em; color: #60a5fa; margin-bottom: 0.5rem;
 }
 .np-art-headline {
-    font-family: 'Playfair Display', Georgia, serif; font-size: 1.2rem;
-    font-weight: 700; color: #e2e8f0; line-height: 1.3; margin-bottom: 0.3rem;
+    font-family: 'Playfair Display', Georgia, serif; font-size: 1.25rem;
+    font-weight: 700; color: #f1f5f9; line-height: 1.25; margin-bottom: 0.4rem;
 }
 .np-art-byline {
-    font-size: 0.72rem; color: rgba(255,255,255,0.3);
-    font-style: italic; margin-bottom: 0.7rem;
+    font-size: 0.7rem; color: rgba(255,255,255,0.25);
+    font-style: italic; margin-bottom: 0.8rem;
 }
 .np-art-body {
-    font-family: 'Source Serif 4', Georgia, serif; font-size: 0.92rem;
-    line-height: 1.65; color: #94a3b8;
+    font-family: 'Source Serif 4', Georgia, serif; font-size: 0.95rem;
+    line-height: 1.7; color: #b0b8c4;
 }
 .np-art-odds {
-    margin-top: 0.8rem; padding-top: 0.6rem;
-    border-top: 1px solid rgba(255,255,255,0.04);
+    margin-top: 0.9rem; padding-top: 0.7rem;
+    border-top: 1px solid rgba(255,255,255,0.05);
     display: flex; gap: 0.5rem; flex-wrap: wrap;
 }
+
 /* Compact Market Watch */
 .np-compact {
-    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
-    border-radius: 10px; padding: 1rem; margin-bottom: 0.8rem;
+    background: linear-gradient(135deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.np-compact:hover {
+    border-color: rgba(96,165,250,0.2);
+    box-shadow: 0 2px 12px rgba(96,165,250,0.05);
 }
 .np-compact-title {
-    font-family: 'Playfair Display', Georgia, serif; font-size: 0.95rem;
-    font-weight: 700; color: #cbd5e1; margin-bottom: 0.4rem; line-height: 1.3;
+    font-family: 'Playfair Display', Georgia, serif; font-size: 0.98rem;
+    font-weight: 700; color: #e2e8f0; margin-bottom: 0.5rem; line-height: 1.3;
 }
 .np-compact-odds {
     font-family: 'Inter', monospace; font-size: 0.82rem; color: #93c5fd;
+    font-weight: 500;
 }
 .np-compact-vol {
-    font-size: 0.72rem; color: rgba(255,255,255,0.3); margin-top: 0.3rem;
+    font-size: 0.72rem; color: rgba(255,255,255,0.25); margin-top: 0.4rem;
+    font-family: 'Inter', monospace;
 }
+
 /* Opinion/Hot Take */
 .np-opinion {
-    border-left: 3px solid #a78bfa; padding: 1rem 1.2rem;
-    margin-bottom: 1rem; background: rgba(167,139,250,0.03);
+    border-left: 3px solid #a78bfa; padding: 1.2rem 1.4rem;
+    margin-bottom: 1.2rem;
+    background: linear-gradient(135deg, rgba(167,139,250,0.04), transparent);
+    border-radius: 0 12px 12px 0;
 }
 .np-opinion-label {
-    font-size: 0.65rem; font-weight: 700; color: #a78bfa;
-    text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 0.3rem;
+    font-size: 0.62rem; font-weight: 700; color: #a78bfa;
+    text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 0.4rem;
 }
 .np-opinion-title {
-    font-family: 'Playfair Display', Georgia, serif; font-size: 1.05rem;
-    font-weight: 700; color: #e2e8f0; margin-bottom: 0.4rem;
+    font-family: 'Playfair Display', Georgia, serif; font-size: 1.1rem;
+    font-weight: 700; color: #f1f5f9; margin-bottom: 0.5rem; line-height: 1.25;
 }
 .np-opinion-text {
-    font-family: 'Source Serif 4', Georgia, serif; font-size: 0.92rem;
-    font-style: italic; line-height: 1.6; color: #94a3b8;
+    font-family: 'Source Serif 4', Georgia, serif; font-size: 0.95rem;
+    font-style: italic; line-height: 1.65; color: #a0a8b4;
+}
+
+/* Featured Market panel (linked from newspaper) */
+.np-featured {
+    background: linear-gradient(135deg, rgba(96,165,250,0.06), rgba(167,139,250,0.03));
+    border: 2px solid rgba(96,165,250,0.2);
+    border-radius: 16px; padding: 1.8rem; margin-bottom: 1.5rem;
+    position: relative;
+}
+.np-featured-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.22em; color: #60a5fa; margin-bottom: 0.5rem;
+}
+.np-featured-title {
+    font-family: 'Playfair Display', Georgia, serif; font-size: 1.6rem;
+    font-weight: 700; color: #f1f5f9; line-height: 1.2; margin-bottom: 0.6rem;
+}
+.np-featured-meta {
+    display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
+    font-size: 0.82rem; color: rgba(255,255,255,0.4); margin-bottom: 0.8rem;
 }
 
 .section-header {
@@ -586,7 +668,8 @@ with st.sidebar:
     app_mode = st.radio(
         "Navigation",
         ["📰 Live Newspaper", "📊 Market Browser"],
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        key="nav_mode",
     )
     st.markdown("---")
 
@@ -633,6 +716,486 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════════
 # NEWSPAPER HELPERS
 # ══════════════════════════════════════════════════════════════
+
+# ── Country flag emoji mapping ────────────────────────────────
+_COUNTRY_FLAGS: dict[str, str] = {
+    "afghanistan": "\U0001f1e6\U0001f1eb", "albania": "\U0001f1e6\U0001f1f1",
+    "algeria": "\U0001f1e9\U0001f1ff", "argentina": "\U0001f1e6\U0001f1f7",
+    "armenia": "\U0001f1e6\U0001f1f2", "australia": "\U0001f1e6\U0001f1fa",
+    "austria": "\U0001f1e6\U0001f1f9", "azerbaijan": "\U0001f1e6\U0001f1ff",
+    "bahrain": "\U0001f1e7\U0001f1ed", "bangladesh": "\U0001f1e7\U0001f1e9",
+    "belarus": "\U0001f1e7\U0001f1fe", "belgium": "\U0001f1e7\U0001f1ea",
+    "bolivia": "\U0001f1e7\U0001f1f4", "bosnia": "\U0001f1e7\U0001f1e6",
+    "brazil": "\U0001f1e7\U0001f1f7", "bulgaria": "\U0001f1e7\U0001f1ec",
+    "cambodia": "\U0001f1f0\U0001f1ed", "cameroon": "\U0001f1e8\U0001f1f2",
+    "canada": "\U0001f1e8\U0001f1e6", "chile": "\U0001f1e8\U0001f1f1",
+    "china": "\U0001f1e8\U0001f1f3", "colombia": "\U0001f1e8\U0001f1f4",
+    "costa rica": "\U0001f1e8\U0001f1f7", "croatia": "\U0001f1ed\U0001f1f7",
+    "cuba": "\U0001f1e8\U0001f1fa", "cyprus": "\U0001f1e8\U0001f1fe",
+    "czech republic": "\U0001f1e8\U0001f1ff", "czechia": "\U0001f1e8\U0001f1ff",
+    "denmark": "\U0001f1e9\U0001f1f0", "dominican republic": "\U0001f1e9\U0001f1f4",
+    "ecuador": "\U0001f1ea\U0001f1e8", "egypt": "\U0001f1ea\U0001f1ec",
+    "el salvador": "\U0001f1f8\U0001f1fb", "estonia": "\U0001f1ea\U0001f1ea",
+    "ethiopia": "\U0001f1ea\U0001f1f9", "finland": "\U0001f1eb\U0001f1ee",
+    "france": "\U0001f1eb\U0001f1f7", "georgia": "\U0001f1ec\U0001f1ea",
+    "germany": "\U0001f1e9\U0001f1ea", "ghana": "\U0001f1ec\U0001f1ed",
+    "greece": "\U0001f1ec\U0001f1f7", "guatemala": "\U0001f1ec\U0001f1f9",
+    "honduras": "\U0001f1ed\U0001f1f3", "hungary": "\U0001f1ed\U0001f1fa",
+    "iceland": "\U0001f1ee\U0001f1f8", "india": "\U0001f1ee\U0001f1f3",
+    "indonesia": "\U0001f1ee\U0001f1e9", "iran": "\U0001f1ee\U0001f1f7",
+    "iraq": "\U0001f1ee\U0001f1f6", "ireland": "\U0001f1ee\U0001f1ea",
+    "israel": "\U0001f1ee\U0001f1f1", "italy": "\U0001f1ee\U0001f1f9",
+    "jamaica": "\U0001f1ef\U0001f1f2", "japan": "\U0001f1ef\U0001f1f5",
+    "jordan": "\U0001f1ef\U0001f1f4", "kazakhstan": "\U0001f1f0\U0001f1ff",
+    "kenya": "\U0001f1f0\U0001f1ea", "kuwait": "\U0001f1f0\U0001f1fc",
+    "latvia": "\U0001f1f1\U0001f1fb", "lebanon": "\U0001f1f1\U0001f1e7",
+    "libya": "\U0001f1f1\U0001f1fe", "lithuania": "\U0001f1f1\U0001f1f9",
+    "luxembourg": "\U0001f1f1\U0001f1fa", "malaysia": "\U0001f1f2\U0001f1fe",
+    "mexico": "\U0001f1f2\U0001f1fd", "moldova": "\U0001f1f2\U0001f1e9",
+    "mongolia": "\U0001f1f2\U0001f1f3", "morocco": "\U0001f1f2\U0001f1e6",
+    "mozambique": "\U0001f1f2\U0001f1ff", "myanmar": "\U0001f1f2\U0001f1f2",
+    "nepal": "\U0001f1f3\U0001f1f5", "netherlands": "\U0001f1f3\U0001f1f1",
+    "new zealand": "\U0001f1f3\U0001f1ff", "nicaragua": "\U0001f1f3\U0001f1ee",
+    "nigeria": "\U0001f1f3\U0001f1ec", "north korea": "\U0001f1f0\U0001f1f5",
+    "north macedonia": "\U0001f1f2\U0001f1f0", "norway": "\U0001f1f3\U0001f1f4",
+    "oman": "\U0001f1f4\U0001f1f2", "pakistan": "\U0001f1f5\U0001f1f0",
+    "palestine": "\U0001f1f5\U0001f1f8", "panama": "\U0001f1f5\U0001f1e6",
+    "paraguay": "\U0001f1f5\U0001f1fe", "peru": "\U0001f1f5\U0001f1ea",
+    "philippines": "\U0001f1f5\U0001f1ed", "poland": "\U0001f1f5\U0001f1f1",
+    "portugal": "\U0001f1f5\U0001f1f9", "qatar": "\U0001f1f6\U0001f1e6",
+    "romania": "\U0001f1f7\U0001f1f4", "russia": "\U0001f1f7\U0001f1fa",
+    "saudi arabia": "\U0001f1f8\U0001f1e6", "senegal": "\U0001f1f8\U0001f1f3",
+    "serbia": "\U0001f1f7\U0001f1f8", "singapore": "\U0001f1f8\U0001f1ec",
+    "slovakia": "\U0001f1f8\U0001f1f0", "slovenia": "\U0001f1f8\U0001f1ee",
+    "somalia": "\U0001f1f8\U0001f1f4", "south africa": "\U0001f1ff\U0001f1e6",
+    "south korea": "\U0001f1f0\U0001f1f7", "spain": "\U0001f1ea\U0001f1f8",
+    "sri lanka": "\U0001f1f1\U0001f1f0", "sudan": "\U0001f1f8\U0001f1e9",
+    "sweden": "\U0001f1f8\U0001f1ea", "switzerland": "\U0001f1e8\U0001f1ed",
+    "syria": "\U0001f1f8\U0001f1fe", "taiwan": "\U0001f1f9\U0001f1fc",
+    "thailand": "\U0001f1f9\U0001f1ed", "tunisia": "\U0001f1f9\U0001f1f3",
+    "turkey": "\U0001f1f9\U0001f1f7", "turkiye": "\U0001f1f9\U0001f1f7",
+    "ukraine": "\U0001f1fa\U0001f1e6", "united arab emirates": "\U0001f1e6\U0001f1ea",
+    "uae": "\U0001f1e6\U0001f1ea", "united kingdom": "\U0001f1ec\U0001f1e7",
+    "uk": "\U0001f1ec\U0001f1e7", "united states": "\U0001f1fa\U0001f1f8",
+    "usa": "\U0001f1fa\U0001f1f8", "us": "\U0001f1fa\U0001f1f8",
+    "uruguay": "\U0001f1fa\U0001f1fe", "uzbekistan": "\U0001f1fa\U0001f1ff",
+    "venezuela": "\U0001f1fb\U0001f1ea", "vietnam": "\U0001f1fb\U0001f1f3",
+    "yemen": "\U0001f1fe\U0001f1ea", "zambia": "\U0001f1ff\U0001f1f2",
+    "zimbabwe": "\U0001f1ff\U0001f1fc",
+}
+
+# ── Sports teams → emoji ────────────────────────────────────────
+_SPORTS_TEAMS: dict[str, str] = {
+    # Football / Soccer ⚽
+    "manchester united": "⚽", "man united": "⚽", "man utd": "⚽",
+    "manchester city": "⚽", "man city": "⚽",
+    "liverpool": "⚽", "chelsea": "⚽", "arsenal": "⚽",
+    "tottenham": "⚽", "spurs": "⚽", "tottenham hotspur": "⚽",
+    "west ham": "⚽", "newcastle": "⚽", "newcastle united": "⚽",
+    "aston villa": "⚽", "everton": "⚽", "brighton": "⚽",
+    "wolverhampton": "⚽", "wolves": "⚽", "crystal palace": "⚽",
+    "fulham": "⚽", "bournemouth": "⚽", "nottingham forest": "⚽",
+    "brentford": "⚽", "burnley": "⚽", "sheffield united": "⚽",
+    "luton": "⚽", "leicester": "⚽", "leeds": "⚽", "southampton": "⚽",
+    "barcelona": "⚽", "real madrid": "⚽", "atletico madrid": "⚽",
+    "sevilla": "⚽", "real sociedad": "⚽", "villarreal": "⚽",
+    "athletic bilbao": "⚽", "real betis": "⚽", "valencia": "⚽",
+    "bayern munich": "⚽", "bayern": "⚽", "borussia dortmund": "⚽",
+    "dortmund": "⚽", "bayer leverkusen": "⚽", "leverkusen": "⚽",
+    "rb leipzig": "⚽", "leipzig": "⚽", "eintracht frankfurt": "⚽",
+    "psg": "⚽", "paris saint-germain": "⚽", "marseille": "⚽",
+    "lyon": "⚽", "monaco": "⚽", "lille": "⚽",
+    "juventus": "⚽", "ac milan": "⚽", "inter milan": "⚽",
+    "napoli": "⚽", "roma": "⚽", "lazio": "⚽", "atalanta": "⚽",
+    "fiorentina": "⚽", "torino": "⚽", "bologna": "⚽",
+    "ajax": "⚽", "psv": "⚽", "feyenoord": "⚽",
+    "benfica": "⚽", "porto": "⚽", "sporting": "⚽", "sporting cp": "⚽",
+    "celtic": "⚽", "rangers": "⚽",
+    "galatasaray": "⚽", "fenerbahce": "⚽", "besiktas": "⚽",
+    "al ahly": "⚽", "al hilal": "⚽", "al nassr": "⚽",
+    "flamengo": "⚽", "palmeiras": "⚽", "corinthians": "⚽",
+    "boca juniors": "⚽", "river plate": "⚽",
+    "la liga": "⚽", "premier league": "⚽", "serie a": "⚽",
+    "bundesliga": "⚽", "ligue 1": "⚽", "champions league": "⚽",
+    "europa league": "⚽", "conference league": "⚽",
+    "world cup": "⚽", "euro 2024": "⚽", "copa america": "⚽",
+    # NBA 🏀
+    "lakers": "🏀", "los angeles lakers": "🏀",
+    "celtics": "🏀", "boston celtics": "🏀",
+    "warriors": "🏀", "golden state warriors": "🏀",
+    "heat": "🏀", "miami heat": "🏀",
+    "bulls": "🏀", "chicago bulls": "🏀",
+    "knicks": "🏀", "new york knicks": "🏀",
+    "nets": "🏀", "brooklyn nets": "🏀",
+    "76ers": "🏀", "sixers": "🏀", "philadelphia 76ers": "🏀",
+    "bucks": "🏀", "milwaukee bucks": "🏀",
+    "nuggets": "🏀", "denver nuggets": "🏀",
+    "mavericks": "🏀", "dallas mavericks": "🏀", "mavs": "🏀",
+    "suns": "🏀", "phoenix suns": "🏀",
+    "clippers": "🏀", "la clippers": "🏀",
+    "raptors": "🏀", "toronto raptors": "🏀",
+    "hawks": "🏀", "atlanta hawks": "🏀",
+    "cavaliers": "🏀", "cleveland cavaliers": "🏀", "cavs": "🏀",
+    "pistons": "🏀", "detroit pistons": "🏀",
+    "pacers": "🏀", "indiana pacers": "🏀",
+    "magic": "🏀", "orlando magic": "🏀",
+    "wizards": "🏀", "washington wizards": "🏀",
+    "hornets": "🏀", "charlotte hornets": "🏀",
+    "grizzlies": "🏀", "memphis grizzlies": "🏀",
+    "pelicans": "🏀", "new orleans pelicans": "🏀",
+    "san antonio spurs": "🏀",
+    "rockets": "🏀", "houston rockets": "🏀",
+    "timberwolves": "🏀", "minnesota timberwolves": "🏀",
+    "thunder": "🏀", "oklahoma city thunder": "🏀", "okc": "🏀",
+    "trail blazers": "🏀", "portland trail blazers": "🏀", "blazers": "🏀",
+    "jazz": "🏀", "utah jazz": "🏀",
+    "kings": "🏀", "sacramento kings": "🏀",
+    # NFL 🏈
+    "chiefs": "🏈", "kansas city chiefs": "🏈",
+    "eagles": "🏈", "philadelphia eagles": "🏈",
+    "49ers": "🏈", "san francisco 49ers": "🏈", "niners": "🏈",
+    "cowboys": "🏈", "dallas cowboys": "🏈",
+    "bills": "🏈", "buffalo bills": "🏈",
+    "ravens": "🏈", "baltimore ravens": "🏈",
+    "dolphins": "🏈", "miami dolphins": "🏈",
+    "jets": "🏈", "new york jets": "🏈",
+    "patriots": "🏈", "new england patriots": "🏈", "pats": "🏈",
+    "packers": "🏈", "green bay packers": "🏈",
+    "bears": "🏈", "chicago bears": "🏈",
+    "lions": "🏈", "detroit lions": "🏈",
+    "vikings": "🏈", "minnesota vikings": "🏈",
+    "commanders": "🏈", "washington commanders": "🏈",
+    "giants": "🏈", "new york giants": "🏈",
+    "steelers": "🏈", "pittsburgh steelers": "🏈",
+    "bengals": "🏈", "cincinnati bengals": "🏈",
+    "browns": "🏈", "cleveland browns": "🏈",
+    "texans": "🏈", "houston texans": "🏈",
+    "colts": "🏈", "indianapolis colts": "🏈",
+    "jaguars": "🏈", "jacksonville jaguars": "🏈", "jags": "🏈",
+    "titans": "🏈", "tennessee titans": "🏈",
+    "broncos": "🏈", "denver broncos": "🏈",
+    "chargers": "🏈", "los angeles chargers": "🏈",
+    "raiders": "🏈", "las vegas raiders": "🏈",
+    "seahawks": "🏈", "seattle seahawks": "🏈",
+    "rams": "🏈", "los angeles rams": "🏈",
+    "cardinals": "🏈", "arizona cardinals": "🏈",
+    "falcons": "🏈", "atlanta falcons": "🏈",
+    "panthers": "🏈", "carolina panthers": "🏈",
+    "saints": "🏈", "new orleans saints": "🏈",
+    "buccaneers": "🏈", "tampa bay buccaneers": "🏈", "bucs": "🏈",
+    "super bowl": "🏈", "nfl mvp": "🏈",
+    # MLB ⚾
+    "yankees": "⚾", "new york yankees": "⚾",
+    "dodgers": "⚾", "los angeles dodgers": "⚾",
+    "red sox": "⚾", "boston red sox": "⚾",
+    "mets": "⚾", "new york mets": "⚾",
+    "cubs": "⚾", "chicago cubs": "⚾",
+    "astros": "⚾", "houston astros": "⚾",
+    "braves": "⚾", "atlanta braves": "⚾",
+    "phillies": "⚾", "philadelphia phillies": "⚾",
+    "padres": "⚾", "san diego padres": "⚾",
+    "world series": "⚾",
+    # NHL 🏒
+    "maple leafs": "🏒", "toronto maple leafs": "🏒",
+    "bruins": "🏒", "boston bruins": "🏒",
+    "new york rangers": "🏒",
+    "penguins": "🏒", "pittsburgh penguins": "🏒",
+    "canadiens": "🏒", "montreal canadiens": "🏒", "habs": "🏒",
+    "blackhawks": "🏒", "chicago blackhawks": "🏒",
+    "oilers": "🏒", "edmonton oilers": "🏒",
+    "avalanche": "🏒", "colorado avalanche": "🏒",
+    "lightning": "🏒", "tampa bay lightning": "🏒",
+    "florida panthers": "🏒",
+    "stanley cup": "🏒",
+    # F1 🏎️
+    "red bull racing": "🏎️", "red bull": "🏎️",
+    "ferrari": "🏎️", "mercedes": "🏎️", "mercedes-amg": "🏎️",
+    "mclaren": "🏎️", "aston martin": "🏎️",
+    "alpine": "🏎️", "williams": "🏎️", "haas": "🏎️",
+    "alphatauri": "🏎️",
+    "sauber": "🏎️", "kick sauber": "🏎️",
+    "verstappen": "🏎️", "hamilton": "🏎️", "leclerc": "🏎️",
+    "norris": "🏎️", "sainz": "🏎️", "piastri": "🏎️",
+    "formula 1": "🏎️", "f1": "🏎️",
+    # Tennis 🎾
+    "djokovic": "🎾", "novak djokovic": "🎾",
+    "alcaraz": "🎾", "carlos alcaraz": "🎾",
+    "sinner": "🎾", "jannik sinner": "🎾",
+    "medvedev": "🎾", "daniil medvedev": "🎾",
+    "swiatek": "🎾", "iga swiatek": "🎾",
+    "sabalenka": "🎾", "aryna sabalenka": "🎾",
+    "gauff": "🎾", "coco gauff": "🎾",
+    "wimbledon": "🎾", "us open": "🎾", "french open": "🎾",
+    "australian open": "🎾", "roland garros": "🎾",
+    # Boxing / MMA 🥊
+    "ufc": "🥊", "boxing": "🥊",
+    # Golf ⛳
+    "masters": "⛳", "the masters": "⛳", "pga": "⛳",
+    "ryder cup": "⛳",
+    # General sport keywords
+    "nba": "🏀", "nfl": "🏈", "mlb": "⚾", "nhl": "🏒",
+    "mls": "⚽", "fifa": "⚽",
+}
+
+# ── Crypto tokens → symbol ──────────────────────────────────────
+_CRYPTO_ICONS: dict[str, str] = {
+    "bitcoin": "₿", "btc": "₿",
+    "ethereum": "⟠", "eth": "⟠", "ether": "⟠",
+    "solana": "◎", "sol": "◎",
+    "xrp": "✕", "ripple": "✕",
+    "dogecoin": "🐕", "doge": "🐕",
+    "cardano": "🔷", "ada": "🔷",
+    "polkadot": "⬡", "dot": "⬡",
+    "chainlink": "⬡",
+    "polygon": "🟣", "matic": "🟣", "pol": "🟣",
+    "litecoin": "Ł", "ltc": "Ł",
+    "uniswap": "🦄", "uni": "🦄",
+    "shiba inu": "🐕", "shib": "🐕",
+    "pepe": "🐸",
+    "toncoin": "💎", "ton": "💎",
+    "sui": "🌊",
+    "near": "🌐", "near protocol": "🌐",
+    "cosmos": "⚛️", "atom": "⚛️",
+}
+
+# ── Notable people / entities → emoji ────────────────────────────
+_ENTITY_ICONS: dict[str, str] = {
+    # US political figures
+    "donald trump": "🇺🇸", "trump": "🇺🇸",
+    "joe biden": "🇺🇸", "biden": "🇺🇸",
+    "kamala harris": "🇺🇸", "harris": "🇺🇸",
+    "ron desantis": "🇺🇸", "desantis": "🇺🇸",
+    "vivek ramaswamy": "🇺🇸", "ramaswamy": "🇺🇸",
+    "nikki haley": "🇺🇸", "haley": "🇺🇸",
+    "jd vance": "🇺🇸", "vance": "🇺🇸",
+    "rfk jr": "🇺🇸", "robert kennedy": "🇺🇸",
+    "pete buttigieg": "🇺🇸",
+    "aoc": "🇺🇸", "alexandria ocasio-cortez": "🇺🇸",
+    "newsom": "🇺🇸", "gavin newsom": "🇺🇸",
+    # Tech / business figures
+    "elon musk": "🚀", "musk": "🚀",
+    "mark zuckerberg": "👤", "zuckerberg": "👤",
+    "sam altman": "🤖", "altman": "🤖",
+    "jensen huang": "🖥️",
+    "tim cook": "🍎",
+    "jeff bezos": "📦", "bezos": "📦",
+    "satya nadella": "💻",
+    # World leaders
+    "putin": "🇷🇺", "vladimir putin": "🇷🇺",
+    "zelensky": "🇺🇦", "zelenskyy": "🇺🇦", "volodymyr zelensky": "🇺🇦",
+    "xi jinping": "🇨🇳", "xi": "🇨🇳",
+    "modi": "🇮🇳", "narendra modi": "🇮🇳",
+    "macron": "🇫🇷", "emmanuel macron": "🇫🇷",
+    "starmer": "🇬🇧", "keir starmer": "🇬🇧",
+    "netanyahu": "🇮🇱", "benjamin netanyahu": "🇮🇱",
+    "erdogan": "🇹🇷",
+    "lula": "🇧🇷",
+    "milei": "🇦🇷", "javier milei": "🇦🇷",
+    "trudeau": "🇨🇦", "justin trudeau": "🇨🇦",
+    # Political parties / institutions
+    "republican": "🐘", "republicans": "🐘", "gop": "🐘",
+    "democrat": "🫏", "democrats": "🫏", "democratic party": "🫏",
+    "federal reserve": "🏛️", "the fed": "🏛️",
+    # Awards / entertainment
+    "oscar": "🏆", "oscars": "🏆", "academy award": "🏆",
+    "grammy": "🎵", "grammys": "🎵",
+    "emmy": "📺", "emmys": "📺",
+    "golden globe": "🏆",
+    # Companies / stocks
+    "spacex": "🚀",
+    "tesla": "⚡", "tsla": "⚡",
+    "apple": "🍎", "aapl": "🍎",
+    "nvidia": "🖥️", "nvda": "🖥️",
+    "google": "🔍", "alphabet": "🔍", "goog": "🔍",
+    "microsoft": "💻", "msft": "💻",
+    "amazon": "📦", "amzn": "📦",
+    "meta": "👤",
+}
+
+
+def _add_icon(name: str) -> str:
+    """Prepend an emoji icon if *name* matches a known entity (country, team, token, person)."""
+    lower = name.strip().lower()
+
+    # 1. Country flags (highest priority — most reliable matches)
+    if lower in _COUNTRY_FLAGS:
+        return f"{_COUNTRY_FLAGS[lower]} {name}"
+    for country, flag in _COUNTRY_FLAGS.items():
+        if len(country) >= 3 and f" {country}" in f" {lower}":
+            return f"{flag} {name}"
+
+    # 2. Sports teams
+    if lower in _SPORTS_TEAMS:
+        return f"{_SPORTS_TEAMS[lower]} {name}"
+    for team, icon in _SPORTS_TEAMS.items():
+        if len(team) >= 4 and f" {team}" in f" {lower}":
+            return f"{icon} {name}"
+
+    # 3. Crypto tokens
+    if lower in _CRYPTO_ICONS:
+        return f"{_CRYPTO_ICONS[lower]} {name}"
+
+    # 4. Notable entities (people, companies, etc.)
+    if lower in _ENTITY_ICONS:
+        return f"{_ENTITY_ICONS[lower]} {name}"
+    for entity, icon in _ENTITY_ICONS.items():
+        if len(entity) >= 4 and f" {entity}" in f" {lower}":
+            return f"{icon} {name}"
+
+    return name
+
+
+# ── Team logo URLs (ESPN CDN) ───────────────────────────────────
+def _espn(sport: str, team_id: str) -> str:
+    return f"https://a.espncdn.com/combiner/i?img=/i/teamlogos/{sport}/500/{team_id}.png&h=25&w=25"
+
+_TEAM_LOGOS: dict[str, str] = {}
+
+# NFL
+for _abbr, _names in {
+    "kc": ["chiefs", "kansas city chiefs"], "phi": ["eagles", "philadelphia eagles"],
+    "sf": ["49ers", "san francisco 49ers", "niners"], "dal": ["cowboys", "dallas cowboys"],
+    "buf": ["bills", "buffalo bills"], "bal": ["ravens", "baltimore ravens"],
+    "mia": ["dolphins", "miami dolphins"], "nyj": ["jets", "new york jets"],
+    "ne": ["patriots", "new england patriots", "pats"],
+    "gb": ["packers", "green bay packers"], "chi": ["bears", "chicago bears"],
+    "det": ["lions", "detroit lions"], "min": ["vikings", "minnesota vikings"],
+    "wsh": ["commanders", "washington commanders"],
+    "nyg": ["giants", "new york giants"], "pit": ["steelers", "pittsburgh steelers"],
+    "cin": ["bengals", "cincinnati bengals"], "cle": ["browns", "cleveland browns"],
+    "hou": ["texans", "houston texans"], "ind": ["colts", "indianapolis colts"],
+    "jax": ["jaguars", "jacksonville jaguars", "jags"],
+    "ten": ["titans", "tennessee titans"], "den": ["broncos", "denver broncos"],
+    "lac": ["chargers", "los angeles chargers"], "lv": ["raiders", "las vegas raiders"],
+    "sea": ["seahawks", "seattle seahawks"], "lar": ["rams", "los angeles rams"],
+    "ari": ["cardinals", "arizona cardinals"], "atl": ["falcons", "atlanta falcons"],
+    "car": ["panthers", "carolina panthers"], "no": ["saints", "new orleans saints"],
+    "tb": ["buccaneers", "tampa bay buccaneers", "bucs"],
+}.items():
+    _u = _espn("nfl", _abbr)
+    for _n in _names:
+        _TEAM_LOGOS[_n] = _u
+
+# NBA
+for _abbr, _names in {
+    "lal": ["lakers", "los angeles lakers"], "bos": ["celtics", "boston celtics"],
+    "gs": ["warriors", "golden state warriors"], "mia": ["heat", "miami heat"],
+    "chi": ["bulls", "chicago bulls"], "ny": ["knicks", "new york knicks"],
+    "bkn": ["nets", "brooklyn nets"],
+    "phi": ["76ers", "sixers", "philadelphia 76ers"],
+    "mil": ["bucks", "milwaukee bucks"], "den": ["nuggets", "denver nuggets"],
+    "dal": ["mavericks", "dallas mavericks", "mavs"],
+    "phx": ["suns", "phoenix suns"], "lac": ["clippers", "la clippers"],
+    "tor": ["raptors", "toronto raptors"], "atl": ["hawks", "atlanta hawks"],
+    "cle": ["cavaliers", "cleveland cavaliers", "cavs"],
+    "det": ["pistons", "detroit pistons"], "ind": ["pacers", "indiana pacers"],
+    "orl": ["magic", "orlando magic"], "wsh": ["wizards", "washington wizards"],
+    "cha": ["hornets", "charlotte hornets"], "mem": ["grizzlies", "memphis grizzlies"],
+    "no": ["pelicans", "new orleans pelicans"],
+    "sa": ["san antonio spurs"],
+    "hou": ["rockets", "houston rockets"],
+    "min": ["timberwolves", "minnesota timberwolves"],
+    "okc": ["thunder", "oklahoma city thunder"],
+    "por": ["trail blazers", "portland trail blazers", "blazers"],
+    "utah": ["jazz", "utah jazz"], "sac": ["kings", "sacramento kings"],
+}.items():
+    _u = _espn("nba", _abbr)
+    for _n in _names:
+        _TEAM_LOGOS[_n] = _u
+
+# MLB
+for _abbr, _names in {
+    "nyy": ["yankees", "new york yankees"], "lad": ["dodgers", "los angeles dodgers"],
+    "bos": ["red sox", "boston red sox"], "nym": ["mets", "new york mets"],
+    "chc": ["cubs", "chicago cubs"], "hou": ["astros", "houston astros"],
+    "atl": ["braves", "atlanta braves"], "phi": ["phillies", "philadelphia phillies"],
+    "sd": ["padres", "san diego padres"],
+}.items():
+    _u = _espn("mlb", _abbr)
+    for _n in _names:
+        _TEAM_LOGOS[_n] = _u
+
+# NHL
+for _abbr, _names in {
+    "tor": ["maple leafs", "toronto maple leafs"],
+    "bos": ["bruins", "boston bruins"], "nyr": ["new york rangers"],
+    "pit": ["penguins", "pittsburgh penguins"],
+    "mtl": ["canadiens", "montreal canadiens", "habs"],
+    "chi": ["blackhawks", "chicago blackhawks"],
+    "edm": ["oilers", "edmonton oilers"], "col": ["avalanche", "colorado avalanche"],
+    "tb": ["lightning", "tampa bay lightning"], "fla": ["florida panthers"],
+}.items():
+    _u = _espn("nhl", _abbr)
+    for _n in _names:
+        _TEAM_LOGOS[_n] = _u
+
+# Soccer (ESPN uses numeric team IDs)
+for _tid, _names in {
+    "359": ["arsenal"], "363": ["chelsea"], "364": ["liverpool"],
+    "382": ["manchester city", "man city"], "360": ["manchester united", "man united", "man utd"],
+    "367": ["tottenham", "tottenham hotspur"], "371": ["west ham"],
+    "361": ["newcastle", "newcastle united"], "362": ["aston villa"],
+    "331": ["brighton"], "384": ["crystal palace"], "368": ["everton"],
+    "370": ["fulham"], "380": ["wolverhampton", "wolves"],
+    "349": ["bournemouth"], "337": ["brentford"], "393": ["nottingham forest"],
+    "375": ["leicester"], "399": ["southampton"],
+    "83": ["barcelona"], "86": ["real madrid"],
+    "1068": ["atletico madrid"],
+    "243": ["sevilla"], "237": ["real sociedad"], "102": ["villarreal"],
+    "93": ["athletic bilbao"], "244": ["real betis"], "94": ["valencia"],
+    "132": ["bayern munich", "bayern"], "124": ["borussia dortmund", "dortmund"],
+    "131": ["bayer leverkusen", "leverkusen"],
+    "11420": ["rb leipzig", "leipzig"], "138": ["eintracht frankfurt"],
+    "160": ["psg", "paris saint-germain"], "176": ["marseille"],
+    "167": ["lyon"], "174": ["monaco"], "166": ["lille"],
+    "111": ["juventus"], "103": ["ac milan"], "110": ["inter milan"],
+    "114": ["napoli"], "104": ["roma"], "105": ["lazio"],
+    "109": ["atalanta"], "113": ["fiorentina"],
+    "2014": ["ajax"], "148": ["psv"], "143": ["feyenoord"],
+    "1903": ["benfica"], "503": ["porto"],
+    "197": ["celtic"], "198": ["rangers"],
+    "3709": ["galatasaray"], "3708": ["fenerbahce"], "3707": ["besiktas"],
+    "2032": ["al hilal"], "2033": ["al nassr"],
+    "819": ["flamengo"], "2031": ["palmeiras"],
+    "5765": ["boca juniors"], "1110": ["river plate"],
+}.items():
+    _u = _espn("soccer", _tid)
+    for _n in _names:
+        _TEAM_LOGOS[_n] = _u
+
+# cleanup loop vars
+for _v in ("_abbr", "_names", "_u", "_tid", "_n"):
+    globals().pop(_v, None)
+
+
+def _add_icon_html(name: str) -> str:
+    """Like _add_icon but returns <img> logo tags for sports teams in HTML contexts."""
+    lower = name.strip().lower()
+
+    # 1. Country flags (emoji works perfectly in HTML)
+    if lower in _COUNTRY_FLAGS:
+        return f"{_COUNTRY_FLAGS[lower]} {name}"
+    for country, flag in _COUNTRY_FLAGS.items():
+        if len(country) >= 3 and f" {country}" in f" {lower}":
+            return f"{flag} {name}"
+
+    # 2. Team logos — render as inline <img>
+    logo_url = _TEAM_LOGOS.get(lower)
+    if not logo_url:
+        for team, url in _TEAM_LOGOS.items():
+            if len(team) >= 4 and f" {team}" in f" {lower}":
+                logo_url = url
+                break
+    if logo_url:
+        return (
+            f'<img src="{logo_url}" class="team-logo" '
+            f"onerror=\"this.style.display='none'\" alt=\"\">"
+            f"{name}"
+        )
+
+    # 3. Fall back to emoji-based icons (crypto, entities, etc.)
+    return _add_icon(name)
+
 
 def _parse_market(mkt: dict):
     """Return (outcomes_list, prices_list, top_outcome, top_prob) for a market."""
@@ -751,7 +1314,8 @@ def _odds_tags_html(outcomes, prices, limit=4, is_multi=False) -> str:
                 cls = "price-leader" if i == 0 and pf > 0.2 else "price-multi"
             else:
                 cls = "price-yes" if pf >= 0.5 else "price-no"
-            parts.append(f'<span class="tag {cls}">{o}: {pf:.0%}</span>')
+            display = _add_icon_html(o) if is_multi else o
+            parts.append(f'<span class="tag {cls}">{display}: {pf:.0%}</span>')
         except Exception:
             pass
     if is_multi and len(pairs) > limit:
@@ -766,9 +1330,10 @@ def _multi_outcomes_html(all_outcomes: list[tuple[str, float]], limit=8) -> str:
     parts = ['<div class="np-multi-outcomes">']
     for i, (name, prob) in enumerate(all_outcomes[:limit]):
         cls = "leader" if i == 0 and prob > 0.1 else ""
+        display_name = _add_icon_html(name)
         parts.append(
             f'<div class="np-multi-outcome {cls}">'
-            f'<div class="np-multi-name">{name}</div>'
+            f'<div class="np-multi-name">{display_name}</div>'
             f'<div class="np-multi-prob">{prob:.0%}</div>'
             f'</div>'
         )
@@ -831,12 +1396,12 @@ def _render_lead(ev: dict, article_text: str):
             <div class="np-lead-text">{article_text}</div>
             <div class="np-pull-quote">
                 <span class="np-pq-num">{pq_num}</span>
-                <span class="np-pq-label">{pq_label}</span>
+                <span class="np-pq-label">{_add_icon_html(pq_label)}</span>
             </div>
         </div>
         {odds_section}
         <div class="np-lead-stats">
-            Volume: {format_volume(vol_tot)} &bull; 24h: {format_volume(vol_24h)} &bull; Liquidity: {format_volume(liq)}
+            Vol {format_volume(vol_tot)} &bull; 24h {format_volume(vol_24h)} &bull; Liq {format_volume(liq)}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -877,7 +1442,7 @@ def _render_compact(ev: dict):
     if multi:
         all_outcomes = _get_all_outcomes(ev)
         # Show top 3 for compact view
-        odds_parts = [f"{name} {prob:.0%}" for name, prob in all_outcomes[:3]]
+        odds_parts = [f"{_add_icon_html(name)} {prob:.0%}" for name, prob in all_outcomes[:3]]
         odds_str = " · ".join(odds_parts) if odds_parts else "—"
         if len(all_outcomes) > 3:
             odds_str += f" +{len(all_outcomes) - 3}"
@@ -909,6 +1474,37 @@ def _render_opinion(ev: dict, article_text: str):
     """, unsafe_allow_html=True)
 
 
+# ── Cross-mode navigation helpers ─────────────────────────────
+
+def _goto_market(ev):
+    """Callback: navigate from newspaper to Market Browser for this event."""
+    st.session_state["nav_mode"] = "\U0001f4ca Market Browser"
+    st.session_state["np_goto_event"] = ev
+
+
+def _back_to_chronicle():
+    """Callback: return to newspaper from Market Browser."""
+    st.session_state["nav_mode"] = "\U0001f4f0 Live Newspaper"
+    st.session_state.pop("np_goto_event", None)
+
+
+def _polymarket_link_html(slug: str, label: str = "Bet on Polymarket") -> str:
+    """Build a styled HTML link to a Polymarket event page."""
+    if not slug:
+        return ""
+    url = f"https://polymarket.com/event/{slug}"
+    return (
+        f'<a href="{url}" target="_blank" rel="noopener" '
+        f'style="display:inline-flex; align-items:center; gap:0.4rem; '
+        f'color:#60a5fa; text-decoration:none; font-size:0.82rem; font-weight:600; '
+        f'padding:0.4rem 0.8rem; border:1px solid rgba(96,165,250,0.25); '
+        f'border-radius:8px; transition:all 0.2s; background:rgba(96,165,250,0.06);"'
+        f' onmouseover="this.style.background=\'rgba(96,165,250,0.12)\';this.style.borderColor=\'rgba(96,165,250,0.4)\'"'
+        f' onmouseout="this.style.background=\'rgba(96,165,250,0.06)\';this.style.borderColor=\'rgba(96,165,250,0.25)\'"'
+        f'>\U0001f517 {label} \u2197</a>'
+    )
+
+
 # ══════════════════════════════════════════════════════════════
 # NEWSPAPER MODE
 # ══════════════════════════════════════════════════════════════
@@ -932,10 +1528,17 @@ if app_mode == "📰 Live Newspaper":
         else:
             base["markets"] = ev.get("markets", [])[:1]
         _events_for_llm.append(base)
-    with st.spinner("Writing today's edition…"):
+
+    # Refresh counter busts the LLM cache so each click generates fresh articles
+    if "np_refresh" not in st.session_state:
+        st.session_state["np_refresh"] = 0
+    _refresh_key = st.session_state["np_refresh"]
+
+    with st.spinner("Writing today's edition..."):
         articles = get_newspaper_articles(
             json.dumps(_events_for_llm),
             api_key=gemini_api_key or None,
+            refresh_key=_refresh_key,
         )
 
     # Masthead
@@ -943,7 +1546,7 @@ if app_mode == "📰 Live Newspaper":
     edition_num = (today - datetime(2025, 1, 1)).days
     st.markdown(f"""
     <div class="np-masthead">
-        <div class="np-dateline">{today.strftime("%A, %B %d, %Y")} &mdash; Edition No.&nbsp;{edition_num}</div>
+        <div class="np-dateline">{today.strftime("%A, %B %d, %Y")} &mdash; Edition No.&nbsp;{edition_num} &mdash; Live Markets</div>
         <div class="np-title">THE POLYMARKET CHRONICLE</div>
         <div class="np-subtitle">All the Odds That Are Fit to Print</div>
     </div>
@@ -958,9 +1561,10 @@ if app_mode == "📰 Live Newspaper":
             if all_outcomes:
                 name, prob = all_outcomes[0]
                 cls = "tk-up" if prob >= 0.3 else ""
+                display_name = _add_icon_html(name[:20])
                 ticker_parts.append(
                     f'<span class="{cls}">{ev.get("title","")[:30]} &bull; '
-                    f'{name[:20]} {prob:.0%}</span>'
+                    f'{display_name} {prob:.0%}</span>'
                 )
         else:
             mkt = ev.get("markets", [{}])[0]
@@ -977,14 +1581,20 @@ if app_mode == "📰 Live Newspaper":
             unsafe_allow_html=True,
         )
 
-    # Refresh button
-    if st.button("🔄 Refresh Edition", use_container_width=False):
-        st.cache_data.clear()
+    # Refresh button — increment counter to bust article cache
+    if st.button("🔄 Fresh Edition", use_container_width=False):
+        st.session_state["np_refresh"] = st.session_state.get("np_refresh", 0) + 1
         st.rerun()
 
     # ── Lead Story ──────────────────────────────────────────
     lead = news_events[0]
     _render_lead(lead, articles.get(str(lead.get("id", "")), ""))
+    st.button(
+        "\U0001f4ca Explore odds & bet calculator \u2192",
+        key="np_goto_lead",
+        on_click=_goto_market,
+        args=(lead,),
+    )
 
     # ── Top Stories (2-col grid) ────────────────────────────
     top_stories = news_events[1:5]
@@ -994,6 +1604,12 @@ if app_mode == "📰 Live Newspaper":
         for i, ev in enumerate(top_stories):
             with (col_a if i % 2 == 0 else col_b):
                 _render_article(ev, articles.get(str(ev.get("id", "")), ""))
+                st.button(
+                    "\U0001f4ca Explore \u2192",
+                    key=f"np_goto_top_{i}",
+                    on_click=_goto_market,
+                    args=(ev,),
+                )
 
     # ── Market Watch (3-col compact) ────────────────────────
     market_watch = news_events[5:10]
@@ -1003,17 +1619,38 @@ if app_mode == "📰 Live Newspaper":
         for i, ev in enumerate(market_watch):
             with mw_cols[i % 3]:
                 _render_compact(ev)
+                st.button(
+                    "\U0001f4ca Details",
+                    key=f"np_goto_mw_{i}",
+                    on_click=_goto_market,
+                    args=(ev,),
+                )
 
     # ── Hot Takes (opinion) ─────────────────────────────────
     hot_takes = news_events[10:]
     if hot_takes:
         st.markdown('<div class="np-section-head">HOT TAKES</div>', unsafe_allow_html=True)
-        for ev in hot_takes:
+        for idx, ev in enumerate(hot_takes):
             _render_opinion(ev, articles.get(str(ev.get("id", "")), ""))
+            st.button(
+                "\U0001f4ca Explore \u2192",
+                key=f"np_goto_ht_{idx}",
+                on_click=_goto_market,
+                args=(ev,),
+            )
 
-    st.markdown("---")
-    mode_label = "AI-generated via Gemini" if gemini_api_key else "Template mode — add Gemini key for AI articles"
-    st.caption(f"The Polymarket Chronicle &bull; Live market data &bull; {mode_label}")
+    # Footer
+    mode_label = "AI-generated via Gemini" if gemini_api_key else "Template mode \u2014 add Gemini key for AI articles"
+    st.markdown(f"""
+    <div style="margin-top:3rem; padding:1.5rem 0; border-top:2px solid rgba(96,165,250,0.15);
+         text-align:center; font-size:0.72rem; color:rgba(255,255,255,0.25);
+         font-family:'Inter',sans-serif; letter-spacing:0.05em;">
+        THE POLYMARKET CHRONICLE &bull; Live prediction market data &bull; {mode_label}<br>
+        <span style="font-size:0.65rem; color:rgba(255,255,255,0.15);">
+            Odds are not guarantees. Past market performance does not predict future outcomes.
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
 
@@ -1022,8 +1659,238 @@ if app_mode == "📰 Live Newspaper":
 # ══════════════════════════════════════════════════════════════
 
 # PAGE HEADER + CATEGORY BAR
-st.markdown("# 🔮 Polymarket Research")
-st.markdown("*Browse prediction markets by category — past outcomes and live bets.*")
+st.markdown("# \U0001f52e Polymarket Research")
+st.markdown("*Browse prediction markets by category \u2014 past outcomes and live bets.*")
+
+# ── Featured Market (linked from newspaper) ───────────────
+if "np_goto_event" in st.session_state:
+    _feat_ev = st.session_state["np_goto_event"]
+    _feat_title = _feat_ev.get("title", "Untitled Event")
+    _feat_markets = _feat_ev.get("markets", [])
+    _feat_closed = _feat_ev.get("closed", True)
+    _feat_vol = float(_feat_ev.get("volume", 0) or 0)
+    _feat_24h = float(_feat_ev.get("volume24hr", 0) or 0)
+    _feat_liq = float(_feat_ev.get("liquidity", 0) or 0)
+    _feat_multi = _is_multi_outcome(_feat_ev)
+
+    _feat_tags = [t.get("label", "") for t in (_feat_ev.get("tags") or [])
+                  if t.get("label") and t.get("label") != "All"]
+    _feat_tags_html = " ".join(f'<span class="tag">{t}</span>' for t in _feat_tags[:5])
+    _feat_status_cls = "ended" if _feat_closed else "live"
+    _feat_status_text = "\u26ab Resolved" if _feat_closed else "\U0001f7e2 Live"
+
+    # Polymarket link (if slug available)
+    _pm_slug = _feat_ev.get("slug", "")
+    _feat_pm_link = _polymarket_link_html(_pm_slug, "Bet on Polymarket")
+
+    st.markdown(f"""
+    <div class="np-featured">
+        <div class="np-featured-label">\U0001f4cc FROM THE CHRONICLE</div>
+        <div class="np-featured-title">{_feat_title}</div>
+        <div class="np-featured-meta">
+            <span class="tag {_feat_status_cls}">{_feat_status_text}</span>
+            <span class="tag vol">\U0001f4b0 {format_volume(_feat_vol)}</span>
+            <span>24h: {format_volume(_feat_24h)}</span>
+            <span>Liquidity: {format_volume(_feat_liq)}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">{_feat_tags_html}</div>
+            {_feat_pm_link}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Multi-outcome overview
+    if _feat_multi:
+        _feat_all_outcomes = _get_all_outcomes(_feat_ev)
+        if _feat_all_outcomes:
+            st.markdown(_multi_outcomes_html(_feat_all_outcomes, limit=12),
+                        unsafe_allow_html=True)
+
+    # Market expanders with bet calculator / resolution details
+    from src.collect.fetch_events import fetch_price_history  # noqa: E402
+
+    _FEAT_COLORS = [
+        "#60a5fa", "#86efac", "#fca5a5", "#fcd34d", "#c4b5fd",
+        "#f9a8d4", "#67e8f9", "#fdba74", "#a5b4fc", "#6ee7b7",
+    ]
+
+    _feat_sorted = sorted(
+        _feat_markets,
+        key=lambda m: (m.get("closed", True), -float(m.get("volume", 0) or 0)),
+    )
+
+    for _fi, _fm in enumerate(_feat_sorted[:10]):
+        _fq = _fm.get("question", "\u2014")
+        _fvol = float(_fm.get("volume", 0) or 0)
+        _fc = _fm.get("closed", True)
+
+        _f_out_raw = _fm.get("outcomes", "[]")
+        _f_pr_raw = _fm.get("outcomePrices", "[]")
+        _f_outcomes = json.loads(_f_out_raw) if isinstance(_f_out_raw, str) else (_f_out_raw or [])
+        _f_prices = json.loads(_f_pr_raw) if isinstance(_f_pr_raw, str) else (_f_pr_raw or [])
+        _f_binary = _is_binary_yesno(_f_outcomes)
+
+        _f_clob_raw = _fm.get("clobTokenIds", "[]")
+        _f_clob = json.loads(_f_clob_raw) if isinstance(_f_clob_raw, str) else (_f_clob_raw or [])
+
+        # Summary line
+        if _fc:
+            _fw = None
+            for _fo, _fp in zip(_f_outcomes, _f_prices):
+                try:
+                    if float(_fp) >= 0.99:
+                        _fw = str(_fo)
+                except Exception:
+                    pass
+            _f_sum = f"\U0001f3c6 {_fw}" if _fw else "\u26ab Resolved"
+        else:
+            _fpp = []
+            for _fo, _fp in zip(_f_outcomes, _f_prices):
+                try:
+                    _fpp.append(f"{_fo}: {float(_fp):.0%}")
+                except Exception:
+                    pass
+            _f_sum = "\U0001f7e2 " + " \u00b7 ".join(_fpp) if _fpp else "\U0001f7e2 Live"
+
+        _f_label = f"{_fq}  \u2014  \U0001f4b0 {format_volume(_fvol)}  |  {_f_sum}"
+        _f_key = f"feat_{_fi}"
+
+        with st.expander(_f_label, expanded=(_fi == 0)):
+            if not _fc:
+                # ── Active: Bet Calculator ─────────────────
+                st.markdown("#### \U0001f4b0 Bet Payout Calculator")
+                _fc1, _fc2, _fc3 = st.columns([1, 1, 2])
+                with _fc1:
+                    _f_chosen = st.selectbox(
+                        "Pick outcome", _f_outcomes or ["Yes"],
+                        key=f"outcome_{_f_key}",
+                    )
+                with _fc2:
+                    _f_bet = st.number_input(
+                        "Your bet ($)", min_value=1, max_value=100000,
+                        value=100, step=10, key=f"bet_{_f_key}",
+                    )
+
+                _f_cprice = 0.5
+                for _fo, _fp in zip(_f_outcomes, _f_prices):
+                    if _fo == _f_chosen:
+                        try:
+                            _f_cprice = float(_fp)
+                        except Exception:
+                            _f_cprice = 0.5
+
+                if _f_cprice > 0:
+                    _f_shares = _f_bet / _f_cprice
+                    _f_payout = _f_shares
+                    _f_profit = _f_payout - _f_bet
+                    _f_roi = (_f_profit / _f_bet) * 100
+
+                    with _fc3:
+                        st.markdown(
+                            f'**If "{_f_chosen}" wins:**\n'
+                            f'- \U0001f4c8 **Payout**: **${_f_payout:,.2f}**\n'
+                            f'- \U0001f4b5 **Profit**: **${_f_profit:,.2f}**\n'
+                            f'- \U0001f4ca **ROI**: **{_f_roi:.1f}%**\n'
+                            f'- \U0001f3af **Implied prob**: {_f_cprice:.1%}\n'
+                            f'- \U0001f3b2 **Odds**: {1/_f_cprice:.2f}x'
+                        )
+                st.caption(
+                    f"Volume: {format_volume(_fvol)} | "
+                    f"Outcomes: {', '.join(_f_outcomes)}"
+                )
+            else:
+                # ── Resolved: Winner & stats ───────────────
+                _fw = None
+                for _fo, _fp in zip(_f_outcomes, _f_prices):
+                    try:
+                        if float(_fp) >= 0.99:
+                            _fw = str(_fo)
+                    except Exception:
+                        pass
+
+                _d1, _d2, _d3 = st.columns(3)
+                with _d1:
+                    st.metric("\U0001f3c6 Winner", _fw or "Unknown")
+                with _d2:
+                    st.metric("\U0001f4b0 Volume", format_volume(_fvol))
+                with _d3:
+                    _sd = _fm.get("startDate") or _fm.get("createdAt")
+                    _ed = _fm.get("endDate") or _fm.get("closedTime")
+                    if _sd and _ed:
+                        try:
+                            _dur = (pd.to_datetime(_ed) - pd.to_datetime(_sd)).days
+                            st.metric("\u23f1\ufe0f Duration", f"{_dur} days")
+                        except Exception:
+                            st.metric("\u23f1\ufe0f Duration", "\u2014")
+                    else:
+                        st.metric("\u23f1\ufe0f Duration", "\u2014")
+
+                if not _f_binary and _f_outcomes:
+                    st.markdown("**Final Resolution:**")
+                    for _fo, _fp in zip(_f_outcomes, _f_prices):
+                        try:
+                            _pv = float(_fp)
+                            _ico = "\U0001f3c6" if _pv >= 0.99 else "\u274c"
+                            st.markdown(f"- {_ico} **{_fo}**: {_pv:.0%}")
+                        except Exception:
+                            pass
+
+            # Price history (first market only, to avoid many API calls)
+            if _fi == 0 and _f_clob:
+                with st.spinner("Loading price history\u2026"):
+                    _fhist = fetch_price_history(_f_clob[0])
+                if _fhist and len(_fhist) > 2:
+                    st.markdown("#### \U0001f4c8 Price History")
+                    _fig = go.Figure()
+                    _ftimes = [datetime.fromtimestamp(h["t"]) for h in _fhist]
+                    _fprices = [float(h["p"]) for h in _fhist]
+                    _flabel = _f_outcomes[0] if _f_outcomes else "Outcome 1"
+                    _fig.add_trace(go.Scatter(
+                        x=_ftimes, y=_fprices, mode="lines",
+                        fill="tozeroy" if _f_binary else None,
+                        line=dict(color=_FEAT_COLORS[0], width=2),
+                        fillcolor="rgba(96,165,250,0.1)" if _f_binary else None,
+                        name=_flabel,
+                    ))
+                    if not _f_binary and len(_f_clob) > 1:
+                        for _ti, _tok in enumerate(_f_clob[1:4], start=1):
+                            _eh = fetch_price_history(_tok)
+                            if _eh and len(_eh) > 2:
+                                _fig.add_trace(go.Scatter(
+                                    x=[datetime.fromtimestamp(h["t"]) for h in _eh],
+                                    y=[float(h["p"]) for h in _eh],
+                                    mode="lines",
+                                    line=dict(color=_FEAT_COLORS[_ti % len(_FEAT_COLORS)], width=2),
+                                    name=_f_outcomes[_ti] if _ti < len(_f_outcomes) else f"Outcome {_ti+1}",
+                                ))
+                    _fig.update_layout(
+                        **CHART_LAYOUT,
+                        title=f'Price of "{_flabel}" over time' if _f_binary else "Outcome Prices",
+                        xaxis_title="Date", yaxis_title="Price ($)", height=300,
+                        showlegend=not _f_binary,
+                    )
+                    _fig.update_yaxes(range=[0, 1.05], gridcolor="rgba(255,255,255,0.05)")
+                    st.plotly_chart(_fig, use_container_width=True)
+
+    # Navigation buttons
+    _bcol1, _bcol2 = st.columns(2)
+    with _bcol1:
+        st.button(
+            "\u2190 Back to The Chronicle",
+            key="feat_back_np",
+            on_click=_back_to_chronicle,
+        )
+    with _bcol2:
+        def _dismiss_featured():
+            st.session_state.pop("np_goto_event", None)
+        st.button(
+            "\u2715 Dismiss \u2014 browse categories",
+            key="feat_dismiss",
+            on_click=_dismiss_featured,
+        )
+
+    st.markdown("---")
 
 # Load categories
 categories = load_categories()
@@ -1176,16 +2043,21 @@ if selected_slug is not None:
         # Event header as HTML
         ev_tags_html = " ".join(f'<span class="tag">{t}</span>' for t in ev_tag_labels)
         status_cls = "ended" if is_closed else "live"
+        _ev_slug = ev.get("slug", "")
+        _ev_pm_link = _polymarket_link_html(_ev_slug, "View on Polymarket")
         st.markdown(
             f'<div class="event-card">'
             f'  <div class="event-title">{title}</div>'
             f'  <div class="event-meta">'
             f'    <span class="tag {status_cls}">{status_tag}</span>'
-            f'    <span class="tag vol">💰 {vol_str}</span>'
+            f'    <span class="tag vol">\U0001f4b0 {vol_str}</span>'
             f'    <span class="tag">{n_markets} market{"s" if n_markets!=1 else ""}</span>'
             f'    {multi_badge}'
             f'  </div>'
-            f'  <div class="event-tags">{ev_tags_html}</div>'
+            f'  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">'
+            f'    <div class="event-tags" style="margin-bottom:0;">{ev_tags_html}</div>'
+            f'    {_ev_pm_link}'
+            f'  </div>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -1203,7 +2075,7 @@ if selected_slug is not None:
                         width_pct = (prob / max_prob) * 100 if max_prob > 0 else 0
                         bar_html_parts.append(
                             f'<div class="outcome-bar-row">'
-                            f'<div class="outcome-bar-label">{name[:30]}</div>'
+                            f'<div class="outcome-bar-label">{_add_icon_html(name[:30])}</div>'
                             f'<div class="outcome-bar-track">'
                             f'<div class="outcome-bar-fill" style="width:{width_pct:.0f}%;background:{color};"></div>'
                             f'</div>'
@@ -1259,11 +2131,11 @@ if selected_slug is not None:
                         if float(p) >= 0.99:
                             winner = str(o)
                     except Exception: pass
-                summary = f"🏆 {winner}" if winner else "⚫ Resolved"
+                summary = f"🏆 {_add_icon(winner)}" if winner else "⚫ Resolved"
             else:
                 price_parts = []
                 for o, p in zip(outcomes_list, prices_list):
-                    try: price_parts.append(f"{o}: {float(p):.0%}")
+                    try: price_parts.append(f"{_add_icon(o)}: {float(p):.0%}")
                     except Exception: pass
                 summary = "🟢 " + " · ".join(price_parts) if price_parts else "🟢 Live"
 
@@ -1316,6 +2188,9 @@ if selected_slug is not None:
                             """)
 
                     st.caption(f"Volume: {format_volume(m_vol)} | Outcomes: {', '.join(outcomes_list)}")
+                    _mkt_pm = _polymarket_link_html(_ev_slug, "Place this bet on Polymarket")
+                    if _mkt_pm:
+                        st.markdown(_mkt_pm, unsafe_allow_html=True)
 
                 else:
                     # ━━━━━━━ RESOLVED MARKET: DETAIL PANEL ━━━━━━━
@@ -1459,7 +2334,11 @@ if selected_slug is not None:
                         else:
                             st.caption("📉 No price history available for this market.")
                     else:
-                        st.caption("📉 No token data for price history.")
+                        st.caption("\U0001f4c9 No token data for price history.")
+
+                    _res_pm = _polymarket_link_html(_ev_slug, "View on Polymarket")
+                    if _res_pm:
+                        st.markdown(_res_pm, unsafe_allow_html=True)
 
     if limit < total_filtered:
         if st.button("⬇️ Load More Events", use_container_width=True):

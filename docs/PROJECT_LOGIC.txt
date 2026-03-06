@@ -1,0 +1,694 @@
+================================================================================
+  POLYMARKET RESEARCH DASHBOARD — COMPLETE PROJECT DOCUMENTATION
+  Last updated: 2026-03-06
+================================================================================
+
+TABLE OF CONTENTS
+  1.  Project Overview
+  2.  File Map
+  3.  Architecture & Data Flow
+  4.  Mode 1: Live Newspaper ("The Polymarket Chronicle")
+  5.  Mode 2: Market Browser
+  6.  Mode 3: All Analytics
+  7.  Multi-Outcome Market Detection
+  8.  Country Flag Emoji System
+  9.  Cross-Mode Navigation (Newspaper -> Market Browser)
+  10. LLM Article Generation System (gemini_writer.py)
+  11. API Data Layer (fetch_events.py)
+  12. Config & Deployment
+  13. CSS Design System
+  14. Session State Keys
+  15. Caching Strategy
+  16. Git & Branch Info
+
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+What it is:
+  A Streamlit dashboard for browsing, analyzing, and reading about Polymarket
+  prediction markets. It has three modes:
+    - Live Newspaper: AI-generated editorial articles about trending markets
+    - Market Browser: Browse by category, view odds, use bet calculator
+    - All Analytics: Charts, P&L estimates, accuracy stats on resolved markets
+
+Tech stack:
+  - Python 3.x + Streamlit 1.54.0
+  - Google Gemini API (gemini-2.5-flash, free tier) for article generation
+  - Polymarket Gamma API (public, no auth) for market data
+  - Plotly for interactive charts
+  - Pandas for data processing
+
+How to run:
+  cd C:\Users\noama\projects\polymarket\.claude\worktrees\trusting-panini
+  C:/Users/noama/projects/polymarket/venv/Scripts/python.exe -m streamlit run dashboard/app.py --server.port 8520
+
+Dependencies (requirements.txt):
+  streamlit, pandas, plotly, requests, google-genai
+
+
+================================================================================
+2. FILE MAP
+================================================================================
+
+dashboard/app.py               (2278 lines)  Main dashboard — all 3 modes, CSS, helpers
+src/llm/__init__.py             (empty)       Package init
+src/llm/gemini_writer.py        (369 lines)   Gemini LLM article generation + fallback
+src/collect/__init__.py         (empty)       Package init
+src/collect/fetch_events.py     (235 lines)   Polymarket API fetchers (events, categories, history)
+src/collect/fetch_markets.py    (exists)      Bulk market fetcher for offline dataset
+config.py                       (41 lines)    API endpoints + data paths
+.env                            (gitignored)  GEMINI_API_KEY=<key>
+.gitignore                      (21 lines)    Ignores .env, secrets.toml, data/, venv/
+requirements.txt                              Python dependencies
+
+
+================================================================================
+3. ARCHITECTURE & DATA FLOW
+================================================================================
+
+Data sources:
+  1. Polymarket Gamma Events API -> Live events (newspaper + market browser)
+     Endpoint: https://gamma-api.polymarket.com/events
+  2. Polymarket CLOB Prices API  -> Price history charts
+     Endpoint: https://clob.polymarket.com/prices-history
+  3. Local file: data/raw/markets_raw.json -> Analytics (offline dataset)
+
+Flow for NEWSPAPER mode:
+  fetch_newspaper_events(limit=15)         # Live API call, sorted by 24h volume
+    -> news_events (list of event dicts)
+    -> Trim to _events_for_llm             # Serialize key fields for LLM
+    -> get_newspaper_articles(json, key)   # Cached Gemini call (15 min TTL)
+      -> generate_articles_batch()         # Single batch prompt to Gemini
+      -> Returns Dict[event_id -> article_text]
+    -> Render: Masthead -> Ticker -> Lead -> Top Stories -> Market Watch -> Hot Takes
+
+Flow for MARKET BROWSER mode:
+  get_top_categories(limit=14)             # Scans top 500 events for tag frequencies
+    -> Category pills shown as radio buttons
+  load_events_for_category(slug)           # Fetches events for selected category
+    -> Filter/sort/paginate
+    -> Render event cards with expanders
+    -> Each market has bet calculator (active) or resolution panel (resolved)
+
+Flow for ANALYTICS mode:
+  load_markets()                           # Reads data/raw/markets_raw.json
+    -> pd.DataFrame with derived columns (primary_tag, resolved_winner, pnl, etc.)
+    -> Renders: KPIs, Top 15 chart, category treemap, timeline, accuracy, upsets
+
+
+================================================================================
+4. MODE 1: LIVE NEWSPAPER ("The Polymarket Chronicle")
+================================================================================
+
+Location in app.py: Lines ~1068-1235
+
+FETCHING:
+  fetch_newspaper_events(limit=15) in fetch_events.py:
+    - Queries Gamma API: order=volume24hr, closed=false, active=true
+    - Fetches 4x the limit (60 events), then scores and ranks
+    - Scoring formula: (vol_24h * time_score) + (competitive * 100000)
+    - Time score multipliers:
+        event > 6 months away   -> 0.3x (penalize)
+        event < 30 days away    -> 1.5x (boost)
+        otherwise               -> 1.0x
+    - Filters: vol_24h >= $1K OR vol_total >= $10K
+    - Returns top 15 by score
+
+LLM ARTICLE GENERATION:
+  For each event, builds _events_for_llm with:
+    - id, title, volume, volume24hr, liquidity, tags, competitive
+    - markets[]: up to 10 sub-markets for multi-outcome, 1 for binary
+  Calls get_newspaper_articles(json_string, api_key, refresh_key)
+    - Cached via @st.cache_data(ttl=900) — 15 minute TTL
+    - refresh_key parameter allows cache busting (incremented on "Fresh Edition" click)
+    - Internally calls generate_articles_batch() -> single Gemini API call
+    - Falls back to template articles if no API key or API error
+
+REFRESH MECHANISM:
+  st.session_state["np_refresh"] counter
+    - Starts at 0
+    - "Fresh Edition" button increments it and calls st.rerun()
+    - The counter is part of the cache key for get_newspaper_articles()
+    - Even if market data is identical, new counter = cache miss = fresh articles
+
+RENDERING SECTIONS:
+  1. MASTHEAD
+     - "THE POLYMARKET CHRONICLE" title (Playfair Display font)
+     - Date, edition number (days since 2025-01-01), "Live Markets" label
+     - Gradient text effect (white -> blue)
+
+  2. TICKER BAR
+     - Top 8 events, scrollable horizontal strip
+     - Shows: title (truncated) + leading outcome + probability
+     - Green for high-probability leaders, red for low
+     - Entity icons (flags, sports, crypto, people) prepended for recognized outcomes
+
+  3. LEAD STORY (news_events[0])
+     - Full-width article with 2-column layout: text + pull-quote sidebar
+     - Pull-quote shows top probability as large gradient number
+     - Multi-outcome events show outcome grid below article
+     - Stats bar: Volume, 24h volume, Liquidity
+     - "Explore odds & bet calculator" button -> navigates to Market Browser
+
+  4. TOP STORIES (news_events[1:5])
+     - 2-column grid layout
+     - Each card: section label, headline, byline, article body, odds tags
+     - Multi-outcome events show grid of outcome cards
+     - "Explore" button on each card
+
+  5. MARKET WATCH (news_events[5:10])
+     - 3-column compact grid
+     - Each card: title, top 3 outcomes with probabilities, 24h volume
+     - "Details" button on each card
+
+  6. HOT TAKES (news_events[10:])
+     - Purple-accented opinion cards
+     - Left border accent, italic text
+     - "Explore" button on each card
+
+  7. FOOTER
+     - AI mode indicator (Gemini vs template)
+     - Disclaimer about odds not being guarantees
+
+NEWSPAPER HELPER FUNCTIONS:
+  _parse_market(mkt)          -> (outcomes, prices, top_outcome, top_prob)
+  _is_binary_yesno(outcomes)  -> bool (True if outcomes are exactly Yes/No)
+  _is_multi_outcome(ev)       -> bool (True if named outcomes or multiple sub-markets)
+  _get_all_outcomes(ev)       -> [(name, prob), ...] sorted by prob desc
+  _odds_tags_html(...)        -> HTML string of tag pills
+  _multi_outcomes_html(...)   -> HTML string of outcome card grid
+  _tag_str(ev)                -> "POLITICS · ELECTIONS" label from event tags
+  _reading_time(text)         -> int (words / 200, min 1)
+  _add_icon(name)             -> "🇺🇸 United States" / "⚽ Barcelona" — prepends entity icon
+  _polymarket_link_html(slug, label) -> Styled HTML link to polymarket.com/event/{slug}
+  _render_lead(ev, text)      -> Renders lead story HTML
+  _render_article(ev, text)   -> Renders standard article HTML
+  _render_compact(ev)         -> Renders compact market watch card
+  _render_opinion(ev, text)   -> Renders hot take card
+
+
+================================================================================
+5. MODE 2: MARKET BROWSER
+================================================================================
+
+Location in app.py: Lines ~1238-1920
+
+NAVIGATION:
+  Sidebar radio: "Live Newspaper" vs "Market Browser" (key="nav_mode")
+  Category bar: horizontal radio with category pills
+  First option "All Analytics" -> analytics mode
+  Other options -> category browser mode
+
+FEATURED MARKET PANEL (from newspaper navigation):
+  When st.session_state["np_goto_event"] exists:
+    - Shows at top of Market Browser, above category pills
+    - Blue gradient border, "FROM THE CHRONICLE" label
+    - Full event detail: title, status, volume, liquidity, tags
+    - Link to Polymarket.com (if slug available)
+    - Multi-outcome grid (if applicable)
+    - Expandable market panels with bet calculator or resolution info
+    - Price history chart for first market
+    - "Back to The Chronicle" and "Dismiss" buttons
+
+CATEGORY BROWSER:
+  1. CATEGORY LOADING
+     get_top_categories(limit=14) scans top 500 events by volume,
+     counts tag frequencies, returns [{label, slug, count}]
+     Cached 5 min via @st.cache_data(ttl=300)
+
+  2. KPI ROW (5 columns)
+     Events count, Markets count, Total Volume, Active count, Resolved count
+
+  3. FILTER CONTROLS
+     - Text search (filters by event title and market question)
+     - Status filter: All / Active / Resolved
+     - Sort: Volume desc/asc, Newest, Oldest
+
+  4. EVENT CARDS (paginated, 15 per page)
+     Each event renders:
+       - HTML card with title, status tag, volume tag, market count
+       - Multi-outcome badge ("N outcomes") if applicable
+       - Event tags from Gamma API
+       - "View on Polymarket" link (opens polymarket.com/event/{slug} in new tab)
+
+  5. MULTI-OUTCOME OVERVIEW EXPANDER
+     For events with multiple sub-markets:
+       - Horizontal bar chart showing all candidates and probabilities
+       - Color-coded bars from palette: blue, green, red, yellow, purple...
+       - Caption about what probabilities represent
+
+  6. INDIVIDUAL MARKET EXPANDERS
+     For each market (up to 15 per event), sorted active-first then by volume:
+
+     ACTIVE MARKET -> Bet Payout Calculator:
+       - Selectbox: pick outcome (Yes/No or named outcomes)
+       - Number input: bet amount ($1 - $100K, default $100)
+       - Calculated results:
+           Payout = bet / price_of_chosen
+           Profit = payout - bet
+           ROI = profit / bet * 100
+           Implied prob = price
+           Odds = 1 / price
+       - Volume and outcomes caption
+       - "Place this bet on Polymarket" link (opens real Polymarket event page)
+
+     RESOLVED MARKET -> Detail Panel:
+       - Winner metric, Volume metric, Duration metric
+       - "Final Resolution" list for non-binary markets
+       - P&L estimates (binary markets only):
+           Uses lastTradePrice as proxy for crowd confidence
+           Winners gain ~ lose_prob * volume
+           Losers lose  ~ lose_prob * volume
+       - Market efficiency label (green/yellow/red)
+       - Price history chart:
+           Fetches from CLOB Prices History API
+           Shows outcome line(s) with fill-to-zero for binary
+           Multi-outcome: up to 4 colored lines with legend
+           Resolution line for binary (green at 1.0 or red at 0.0)
+       - "View on Polymarket" link at bottom of resolved panel
+
+  POLYMARKET LINKS:
+     Built by _polymarket_link_html(slug, label) helper.
+     URL pattern: https://polymarket.com/event/{slug}
+     The slug comes from ev.get("slug") on the event object (Gamma API).
+     Styled as a blue bordered button with hover effect, opens in new tab.
+     Placed at: event card header, active market expander, resolved market expander,
+     and featured market panel.
+
+  7. PAGINATION
+     "Load More Events" button adds 15 more (st.session_state.cat_limit)
+
+
+================================================================================
+6. MODE 3: ALL ANALYTICS
+================================================================================
+
+Location in app.py: Lines ~1920-end (~2278)
+
+DATA SOURCE:
+  load_markets() reads data/raw/markets_raw.json (static offline dataset)
+  Returns pd.DataFrame with derived columns:
+    - primary_tag: category label (heuristic mapping from event tags/category)
+    - resolved_winner: outcome with price >= 0.99, else "Unresolved"
+    - implied_prob: lastTradePrice as float (0-1)
+    - is_binary_yesno: True if outcomes are exactly {"yes", "no"}
+    - crowd_win_pct / crowd_lose_pct: winner/loser share of volume
+    - est_loser_loss / est_winner_gain: estimated P&L from probabilities
+    - crowd_was_right: True if crowd_win_pct >= 0.5
+    - duration_days: endDate - startDate in days
+    - end_month: year-month period string for timeline
+
+P&L COMPUTATION (compute_pnl):
+  Binary markets: win_prob = prob if winner is outcomes[0], else 1-prob
+  Non-binary markets: win_prob = prob directly (lastTradePrice of winner's share)
+  lose_prob = 1 - win_prob
+
+EFFICIENCY COMPUTATION (get_efficiency):
+  For resolved markets: efficiency = implied_prob * 100
+  Handles binary and non-binary the same way (uses prob directly)
+  >= 70% -> high confidence
+  >= 50% -> divided
+  < 50%  -> upset (crowd got it wrong)
+
+SIDEBAR FILTERS:
+  - Search by question text
+  - Winner filter: specific outcome
+  - Accuracy filter: Accurate / Inaccurate / All
+  - Multi-select tags filter
+  - Volume range slider
+  - Date range filter
+
+CHARTS:
+  1. Top 15 Markets by Volume (horizontal bar chart)
+     Colors: green for "Yes" winners, red for "No", purple for named winners
+  2. Volume by Category (treemap)
+  3. Markets Closed per Month (timeline)
+  4. Market Accuracy by Category (bar chart, shows % crowd-was-right)
+  5. Biggest Upsets (where crowd got it wrong, crowd_was_right=False)
+  6. Market Efficiency Distribution (histogram of efficiency scores)
+
+MARKET CARDS:
+  For each filtered market (paginated):
+    - Question, winner (green badge or red badge), probability
+    - Volume, duration, accuracy stats
+    - P&L row: winners gain / losers loss estimates
+
+
+================================================================================
+7. MULTI-OUTCOME MARKET DETECTION
+================================================================================
+
+The Polymarket API has two types of non-binary markets:
+
+TYPE 1: Single market with multiple named outcomes
+  Example: "Who will win the election?" -> outcomes: ["Trump", "Biden", "DeSantis"]
+  Detection: outcomes list is NOT {"yes", "no"}
+
+TYPE 2: Multi-market events (each sub-market = one candidate)
+  Example: Event "Who wins the election?"
+    Market 1: "Trump?" -> Yes 65%, No 35%
+    Market 2: "Biden?" -> Yes 25%, No 75%
+    Market 3: "DeSantis?" -> Yes 8%, No 92%
+  Detection: len(markets) > 1
+
+Helper functions:
+
+  _is_binary_yesno(outcomes: list) -> bool
+    Returns True ONLY if outcomes == {"yes", "no"} (case-insensitive, exactly 2)
+
+  _is_multi_outcome(ev: dict) -> bool
+    Returns True if:
+      - First market's outcomes are NOT Yes/No, OR
+      - Event has multiple sub-markets (len(markets) > 1)
+
+  _get_all_outcomes(ev: dict) -> list[tuple[str, float]]
+    Returns sorted [(name, probability), ...] descending by prob
+    For Type 1: directly uses outcomes and prices from market
+    For Type 2: extracts "Yes" price from each sub-market's question
+    For standard binary: returns [(outcome, price), ...]
+
+These helpers are used in:
+  - Newspaper rendering (outcome grids, ticker, odds tags)
+  - Market Browser (outcome overview panel, market badges)
+  - LLM prompt building (market type annotation)
+  - Analytics (P&L computation, efficiency, chart colors)
+
+
+================================================================================
+8. ENTITY ICON / EMOJI SYSTEM
+================================================================================
+
+Location: app.py, multiple dicts + _add_icon() function
+
+Four dictionaries provide emoji lookups for different entity types:
+
+_COUNTRY_FLAGS  — 90+ country names -> Unicode flag emojis (🇺🇸, 🇫🇷, 🇧🇷...)
+_SPORTS_TEAMS   — 200+ team/league names -> sport emojis:
+                  Soccer ⚽, NBA 🏀, NFL 🏈, MLB ⚾, NHL 🏒, F1 🏎️, Tennis 🎾
+_CRYPTO_ICONS   — 25+ token names -> symbols (₿, ⟠, ◎, 🐕, 🦄...)
+_ENTITY_ICONS   — 60+ people/companies/parties -> emojis (🚀, 🐘, 🫏, 🏆...)
+
+_add_icon(name: str) -> str
+  Priority order: country flags > sports teams > crypto > entities
+  1. Direct match against each dict (O(1) lookup)
+  2. Partial substring match for entries >= 3-4 chars
+  3. No match: returns name unchanged
+
+Applied to (9 locations):
+  - Multi-outcome grid cards (np-multi-outcomes)
+  - Odds tag pills
+  - Ticker bar outcomes
+  - Compact market watch outcomes
+  - Lead story pull-quote label
+  - Market Browser bar chart labels
+  - Market expander summary lines (winner + live prices)
+
+
+================================================================================
+9. CROSS-MODE NAVIGATION (Newspaper -> Market Browser)
+================================================================================
+
+Purpose: Click an article in the newspaper -> see full bet info in Market Browser
+
+MECHANISM:
+  Session state based. Three keys:
+    st.session_state["nav_mode"]       = radio button value (controls active mode)
+    st.session_state["np_goto_event"]  = full event dict from newspaper
+    st.session_state["np_refresh"]     = refresh counter for article cache
+
+CALLBACKS:
+  _goto_market(ev):
+    Sets nav_mode to "Market Browser"
+    Stores event in np_goto_event
+    Button click auto-triggers st.rerun()
+
+  _back_to_chronicle():
+    Sets nav_mode to "Live Newspaper"
+    Removes np_goto_event from session state
+
+NEWSPAPER SIDE (buttons):
+  After each article render, a st.button with on_click=_goto_market:
+    Lead story:   "Explore odds & bet calculator ->"   key: np_goto_lead
+    Top stories:  "Explore ->"                         key: np_goto_top_{i}
+    Market watch: "Details"                            key: np_goto_mw_{i}
+    Hot takes:    "Explore ->"                         key: np_goto_ht_{i}
+
+MARKET BROWSER SIDE (featured panel):
+  At the top of Market Browser, BEFORE category selection:
+    if "np_goto_event" in st.session_state:
+      -> Renders featured market panel with:
+         - Blue gradient border card with "FROM THE CHRONICLE" label
+         - Event title, status, volume, 24h volume, liquidity, tags
+         - Polymarket.com link (if slug available)
+         - Multi-outcome grid (if applicable)
+         - Market expanders with bet calculator (active) or resolution info (resolved)
+         - Price history chart for first market
+         - "Back to The Chronicle" button (calls _back_to_chronicle)
+         - "Dismiss" button (removes np_goto_event, keeps in Market Browser)
+
+
+================================================================================
+10. LLM ARTICLE GENERATION SYSTEM (gemini_writer.py)
+================================================================================
+
+OVERVIEW:
+  Single batch API call to Gemini gemini-2.5-flash model.
+  All 15 newspaper events sent in one prompt.
+  Returns JSON mapping event_id -> article text.
+  Falls back to template articles on failure.
+
+ARTICLE STYLES (5 total, assigned deterministically via MD5 hash of event ID):
+  1. breaking_news  - urgent, AP-style wire reporting, inverted pyramid
+  2. analysis       - measured, Financial Times column, analyze numbers
+  3. market_watch   - concise, Bloomberg terminal style, data-first
+  4. opinion        - provocative, contrarian, editorial page voice
+  5. human_interest - narrative, New Yorker storytelling
+
+SYSTEM PROMPT (WRITING PROTOCOL):
+  Voice: "sharp, confident, slightly irreverent -- like Matt Levine meets Bloomberg"
+  8 rules:
+    1. LENGTH: 3-5 sentences, 60-100 words, no filler
+    2. OPENER: Lead with most interesting number/contrast/claim
+       Banned openings: "A new market...", "Traders are watching...", etc.
+    3. DATA WEAVING: "a commanding 81%" not "81%", contextualize all numbers
+    4. VOICE: Active only, strong verbs (surges, collapses, defies, commands)
+    5. CLOSER: End with catalyst or tension, make reader want to check back
+    6. FORMAT: Plain prose, no markdown/bullets/emojis
+    7. MULTI-OUTCOME: Horse-race narrative, name frontrunner and dark horse
+    8. VARIETY: Each article must feel distinct, vary openers
+
+BATCH PROMPT BUILDING (_build_batch_prompt):
+  For each event, includes:
+    - Market ID, Title, Question
+    - Current Odds (JSON dict)
+    - 24h Volume, Total Volume
+    - Tags
+    - Market Type annotation (MULTI-OUTCOME with candidate count if applicable)
+    - Assigned style name + tone + structure
+
+MARKET SUMMARY BUILDING (_build_market_summary):
+  Detects market_type:
+    - "binary": standard Yes/No
+    - "multi_outcome": single market with named outcomes
+    - "multi_market": event with multiple sub-markets (each = candidate)
+  For multi_market: aggregates all sub-markets' "Yes" prices into unified odds dict
+
+RESPONSE PARSING (_parse_batch_response):
+  1. Strip markdown code fences if present
+  2. Parse JSON dict
+  3. Validate: each article must be string with length > 20
+  4. Fill any missing with _fallback_article()
+
+FALLBACK TEMPLATES (when no API key or API error):
+  Binary: _OPENERS templates with volume/probability/strength variables
+  Multi-outcome: _MULTI_OPENERS templates with frontrunner/runner-up/n-way
+  _CLOSERS: 5 forward-looking sentence templates
+  Random selection seeded by event title (deterministic per event)
+
+API CONFIGURATION:
+  Model: gemini-2.5-flash
+  Temperature: 0.85
+  Max output tokens: 4000
+  Library: google-genai (google.genai + google.genai.types)
+
+
+================================================================================
+11. API DATA LAYER (fetch_events.py)
+================================================================================
+
+FUNCTIONS:
+
+fetch_events_by_category(tag_slug, max_pages=5, include_closed=True)
+  Fetches paginated events from Gamma API, filtered by category tag.
+  100 events per page, up to max_pages pages.
+  Retry logic: 3 attempts with exponential backoff (2^attempt seconds).
+  Deduplicates by event ID.
+  Used by: Market Browser mode.
+
+get_top_categories(limit=15)
+  Scans top 500 events (by volume) from Gamma API.
+  Counts tag frequencies across all events.
+  Normalizes slugs: "trump-presidency" -> "trump", "us-current-affairs" -> "us-politics"
+  Filters out "potusbanner" tags.
+  Returns: [{label, slug, count}] sorted by count.
+  Used by: Market Browser category pills.
+
+fetch_price_history(token_id, fidelity=60)
+  Fetches historical price data from CLOB Prices API.
+  Returns: [{t: unix_timestamp, p: price_float}]
+  Used by: Market Browser price charts, Featured Market panel.
+
+fetch_newspaper_events(limit=15)
+  Fetches active, high-interest events for the newspaper.
+  Query params: order=volume24hr, closed=false, active=true
+  Fetches 4x the limit, then scores and filters.
+  Score = (vol_24h * time_score) + (competitive * 100000)
+  Used by: Newspaper mode.
+
+
+================================================================================
+12. CONFIG & DEPLOYMENT
+================================================================================
+
+config.py:
+  PROJECT_ROOT     = Path to project root
+  GAMMA_API_BASE   = "https://gamma-api.polymarket.com"
+  CLOB_API_BASE    = "https://clob.polymarket.com"
+  EVENTS_ENDPOINT  = GAMMA_API_BASE + "/events"
+  MARKETS_ENDPOINT = GAMMA_API_BASE + "/markets"
+  CLOB_PRICES_HISTORY = CLOB_API_BASE + "/prices-history"
+  DATA_RAW         = PROJECT_ROOT / "data" / "raw"
+  DATA_PROCESSED   = PROJECT_ROOT / "data" / "processed"
+  Auto-creates all data directories on import.
+
+API KEY MANAGEMENT:
+  Local dev: .env file at project root with GEMINI_API_KEY=<key>
+    Loaded at app startup via manual .env parser (lines 21-28 of app.py)
+  Streamlit Cloud: st.secrets["GEMINI_API_KEY"]
+    Loaded at app startup via st.secrets iteration (lines 30-36 of app.py)
+  Sidebar: hidden server key + optional user override text input
+    gemini_api_key = user_key or server_key
+
+.gitignore:
+  __pycache__/, .env, .streamlit/secrets.toml, venv/
+  data/raw/ (except markets_raw.json), data/processed/, data/features/, outputs/
+
+
+================================================================================
+13. CSS DESIGN SYSTEM
+================================================================================
+
+FONTS:
+  - Inter (weights 300-700): UI text, labels, monospace numbers
+  - Playfair Display (weights 400, 700, 900): Headlines, titles
+  - Source Serif 4 (weights 400, 600): Article body text
+  Loaded from Google Fonts CDN.
+
+COLOR PALETTE:
+  Background:    dark blue-gray gradients (rgba(25-40, 30-50, 40-65))
+  Primary:       #60a5fa (blue), #93c5fd (light blue)
+  Accent:        #a78bfa (purple), #c4b5fd (light purple)
+  Success:       #4ade80, #86efac (green)
+  Danger:        #fca5a5 (red)
+  Warning:       #fcd34d (yellow)
+  Text primary:  #f1f5f9, #e2e8f0
+  Text secondary: #cbd5e1, #94a3b8
+  Text muted:    rgba(255,255,255, 0.25-0.5)
+
+KEY CSS CLASSES:
+  Newspaper:
+    .np-masthead           Centered header with gradient title
+    .np-ticker             Scrollable ticker bar
+    .np-section-head       Section dividers with gradient rule
+    .np-lead               Lead story container
+    .np-lead-headline      Large Playfair Display headline
+    .np-pull-quote         Sidebar probability callout
+    .np-article            Standard article card (hover lift effect)
+    .np-compact            Market watch compact card
+    .np-opinion            Purple-accented hot take card
+    .np-multi-outcomes     CSS grid for outcome cards
+    .np-multi-outcome      Individual outcome card (hover effect)
+    .np-featured           Blue gradient border card (from-newspaper link)
+
+  Market Browser:
+    .cat-pill              Category selection pill
+    .metric-card           KPI display card
+    .event-card            Event container card
+    .market-row            Market row inside event
+    .outcome-bar-*         Horizontal bar chart for outcomes
+
+  Shared:
+    .tag                   Base tag pill style
+    .tag.win / .tag.lose   Green/red winner tags
+    .tag.price-yes/no      Probability tags (green/red)
+    .tag.price-multi       Blue tag for multi-outcome
+    .tag.price-leader      Green highlighted leader tag with glow
+    .tag.live              Pulsing green "Live" tag
+    .tag.vol               Purple volume tag
+
+  Analytics:
+    .market-card           Market card in analytics list
+    .pnl-row               P&L display row
+
+
+================================================================================
+14. SESSION STATE KEYS
+================================================================================
+
+Key                        Type     Purpose
+-------------------------  -------  ------------------------------------------------
+nav_mode                   str      Sidebar radio value: "Live Newspaper" or "Market Browser"
+np_refresh                 int      Counter for busting article cache (incremented on refresh)
+np_goto_event              dict     Event data for cross-mode navigation (newspaper -> browser)
+cat_limit                  int      Pagination: events shown in category browser
+last_cat_filters           tuple    Previous filter state (to reset pagination on change)
+cat_search                 str      Search text in category browser
+cat_status                 str      Status filter in category browser
+cat_sort                   str      Sort option in category browser
+outcome_mkt_{i}_{j}        str      Selected outcome in bet calculator (market browser)
+bet_mkt_{i}_{j}            int      Bet amount in bet calculator (market browser)
+outcome_feat_{i}           str      Selected outcome in featured market panel
+bet_feat_{i}               int      Bet amount in featured market panel
+all_limit                  int      Pagination: markets shown in analytics
+last_all_filters           tuple    Previous filter state for analytics
+
+
+================================================================================
+15. CACHING STRATEGY
+================================================================================
+
+Function                     TTL      Notes
+---------------------------  -------  -----------------------------------------------
+load_markets()               None     Cached forever (static file, clears on fetch)
+load_categories()            300s     5 min — category list doesn't change often
+load_events_for_category()   120s     2 min — events update more frequently
+get_newspaper_articles()     900s     15 min — LLM articles, busted via refresh_key
+
+Cache busting:
+  - "Fetch More Markets" button: calls st.cache_data.clear() (clears ALL caches)
+  - "Fresh Edition" button: increments refresh_key (only busts article cache)
+
+Note: fetch_newspaper_events() is NOT cached (always makes fresh API call)
+  because the newspaper needs the latest active events.
+
+
+================================================================================
+16. GIT & BRANCH INFO
+================================================================================
+
+Repository:       NoamAri/polymarket-research
+Branch:           claude/trusting-panini
+Worktree path:    C:\Users\noama\projects\polymarket\.claude\worktrees\trusting-panini
+Main project:     C:\Users\noama\projects\polymarket
+Venv (shared):    C:\Users\noama\projects\polymarket\venv
+
+Key commits:
+  10b8071   Cherry-picked LLM newspaper overhaul from feature/newspaper-llm-overhaul
+  bd8656e   Multi-outcome support across all 3 modes + design improvements
+  (pending)  Cross-mode navigation + country flags + refresh fix + CSS redesign
+
+================================================================================
+END OF DOCUMENT
+================================================================================
