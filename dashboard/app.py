@@ -13,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -784,6 +785,47 @@ _COUNTRY_FLAGS: dict[str, str] = {
     "zimbabwe": "\U0001f1ff\U0001f1fc",
 }
 
+# ── Country name → ISO 3166-1 alpha-2 code (for flag images) ───
+_COUNTRY_ISO: dict[str, str] = {
+    "afghanistan": "af", "albania": "al", "algeria": "dz",
+    "argentina": "ar", "armenia": "am", "australia": "au",
+    "austria": "at", "azerbaijan": "az", "bahrain": "bh",
+    "bangladesh": "bd", "belarus": "by", "belgium": "be",
+    "bolivia": "bo", "bosnia": "ba", "brazil": "br", "bulgaria": "bg",
+    "cambodia": "kh", "cameroon": "cm", "canada": "ca", "chile": "cl",
+    "china": "cn", "colombia": "co", "costa rica": "cr", "croatia": "hr",
+    "cuba": "cu", "cyprus": "cy", "czech republic": "cz", "czechia": "cz",
+    "denmark": "dk", "dominican republic": "do",
+    "ecuador": "ec", "egypt": "eg", "el salvador": "sv",
+    "estonia": "ee", "ethiopia": "et", "finland": "fi",
+    "france": "fr", "georgia": "ge", "germany": "de", "ghana": "gh",
+    "greece": "gr", "guatemala": "gt", "honduras": "hn", "hungary": "hu",
+    "iceland": "is", "india": "in", "indonesia": "id", "iran": "ir",
+    "iraq": "iq", "ireland": "ie", "israel": "il", "italy": "it",
+    "jamaica": "jm", "japan": "jp", "jordan": "jo", "kazakhstan": "kz",
+    "kenya": "ke", "kuwait": "kw", "latvia": "lv", "lebanon": "lb",
+    "libya": "ly", "lithuania": "lt", "luxembourg": "lu", "malaysia": "my",
+    "mexico": "mx", "moldova": "md", "mongolia": "mn", "morocco": "ma",
+    "mozambique": "mz", "myanmar": "mm", "nepal": "np", "netherlands": "nl",
+    "new zealand": "nz", "nicaragua": "ni", "nigeria": "ng",
+    "north korea": "kp", "north macedonia": "mk", "norway": "no",
+    "oman": "om", "pakistan": "pk", "palestine": "ps", "panama": "pa",
+    "paraguay": "py", "peru": "pe", "philippines": "ph", "poland": "pl",
+    "portugal": "pt", "qatar": "qa", "romania": "ro", "russia": "ru",
+    "saudi arabia": "sa", "senegal": "sn", "serbia": "rs",
+    "singapore": "sg", "slovakia": "sk", "slovenia": "si",
+    "somalia": "so", "south africa": "za", "south korea": "kr",
+    "spain": "es", "sri lanka": "lk", "sudan": "sd",
+    "sweden": "se", "switzerland": "ch", "syria": "sy", "taiwan": "tw",
+    "thailand": "th", "tunisia": "tn", "turkey": "tr", "turkiye": "tr",
+    "ukraine": "ua", "united arab emirates": "ae", "uae": "ae",
+    "united kingdom": "gb", "uk": "gb",
+    "united states": "us", "usa": "us", "us": "us",
+    "uruguay": "uy", "uzbekistan": "uz",
+    "venezuela": "ve", "vietnam": "vn",
+    "yemen": "ye", "zambia": "zm", "zimbabwe": "zw",
+}
+
 # ── Sports teams → emoji ────────────────────────────────────────
 _SPORTS_TEAMS: dict[str, str] = {
     # Football / Soccer ⚽
@@ -1168,18 +1210,29 @@ for _v in ("_abbr", "_names", "_u", "_tid", "_n"):
     globals().pop(_v, None)
 
 
+def _flag_img(iso: str) -> str:
+    """Return an <img> tag for a country flag from flagcdn.com."""
+    return (
+        f'<img src="https://flagcdn.com/w40/{iso}.png" class="team-logo" '
+        f"onerror=\"this.style.display='none'\" alt=\"\">"
+    )
+
+
 def _add_icon_html(name: str) -> str:
-    """Like _add_icon but returns <img> logo tags for sports teams in HTML contexts."""
+    """Return <img> tags for countries (flag images) and sports teams (logos) in HTML contexts."""
     lower = name.strip().lower()
 
-    # 1. Country flags (emoji works perfectly in HTML)
-    if lower in _COUNTRY_FLAGS:
-        return f"{_COUNTRY_FLAGS[lower]} {name}"
-    for country, flag in _COUNTRY_FLAGS.items():
-        if len(country) >= 3 and f" {country}" in f" {lower}":
-            return f"{flag} {name}"
+    # 1. Country flags — render as <img> from flagcdn.com
+    iso = _COUNTRY_ISO.get(lower)
+    if not iso:
+        for country, code in _COUNTRY_ISO.items():
+            if len(country) >= 3 and f" {country}" in f" {lower}":
+                iso = code
+                break
+    if iso:
+        return f"{_flag_img(iso)}{name}"
 
-    # 2. Team logos — render as inline <img>
+    # 2. Team logos — render as inline <img> from ESPN CDN
     logo_url = _TEAM_LOGOS.get(lower)
     if not logo_url:
         for team, url in _TEAM_LOGOS.items():
@@ -1836,41 +1889,68 @@ if "np_goto_event" in st.session_state:
                         except Exception:
                             pass
 
-            # Price history (first market only, to avoid many API calls)
+            # Market dashboard (first market only, to avoid many API calls)
             if _fi == 0 and _f_clob:
-                with st.spinner("Loading price history\u2026"):
+                with st.spinner("Loading market data\u2026"):
                     _fhist = fetch_price_history(_f_clob[0])
                 if _fhist and len(_fhist) > 2:
-                    st.markdown("#### \U0001f4c8 Price History")
-                    _fig = go.Figure()
+                    # Key stats row
+                    _sc1, _sc2, _sc3, _sc4 = st.columns(4)
+                    _sc1.metric("\U0001f4b0 Total Volume", format_volume(_feat_vol))
+                    _sc2.metric("\U0001f4c8 24h Volume", format_volume(_feat_24h))
+                    _sc3.metric("\U0001f4a7 Liquidity", format_volume(_feat_liq))
+                    _sc4.metric("\U0001f4ca Markets", str(len(_feat_markets)))
+
+                    st.markdown("#### \U0001f4ca Market Dashboard")
                     _ftimes = [datetime.fromtimestamp(h["t"]) for h in _fhist]
                     _fprices = [float(h["p"]) for h in _fhist]
                     _flabel = _f_outcomes[0] if _f_outcomes else "Outcome 1"
+
+                    _fig = make_subplots(
+                        rows=2, cols=1, shared_xaxes=True,
+                        row_heights=[0.7, 0.3], vertical_spacing=0.06,
+                        subplot_titles=("Implied Probability", "Market Activity"),
+                    )
                     _fig.add_trace(go.Scatter(
-                        x=_ftimes, y=_fprices, mode="lines",
+                        x=_ftimes, y=[p * 100 for p in _fprices], mode="lines",
                         fill="tozeroy" if _f_binary else None,
                         line=dict(color=_FEAT_COLORS[0], width=2),
                         fillcolor="rgba(96,165,250,0.1)" if _f_binary else None,
-                        name=_flabel,
-                    ))
+                        name=_flabel, hovertemplate="%{y:.1f}%<extra></extra>",
+                    ), row=1, col=1)
                     if not _f_binary and len(_f_clob) > 1:
                         for _ti, _tok in enumerate(_f_clob[1:4], start=1):
                             _eh = fetch_price_history(_tok)
                             if _eh and len(_eh) > 2:
                                 _fig.add_trace(go.Scatter(
                                     x=[datetime.fromtimestamp(h["t"]) for h in _eh],
-                                    y=[float(h["p"]) for h in _eh],
+                                    y=[float(h["p"]) * 100 for h in _eh],
                                     mode="lines",
                                     line=dict(color=_FEAT_COLORS[_ti % len(_FEAT_COLORS)], width=2),
                                     name=_f_outcomes[_ti] if _ti < len(_f_outcomes) else f"Outcome {_ti+1}",
-                                ))
+                                    hovertemplate="%{y:.1f}%<extra></extra>",
+                                ), row=1, col=1)
+                    # Volatility panel — rolling absolute price changes
+                    if len(_fprices) > 5:
+                        _changes = [abs(_fprices[i] - _fprices[i-1]) * 100 for i in range(1, len(_fprices))]
+                        _win = max(len(_changes) // 20, 3)
+                        _vol_smooth = []
+                        for _ci in range(len(_changes)):
+                            _start = max(0, _ci - _win + 1)
+                            _vol_smooth.append(sum(_changes[_start:_ci+1]) / (_ci - _start + 1))
+                        _fig.add_trace(go.Bar(
+                            x=_ftimes[1:], y=_vol_smooth, name="Activity",
+                            marker_color="rgba(251,191,36,0.5)",
+                            hovertemplate="Activity: %{y:.2f}pp<extra></extra>",
+                        ), row=2, col=1)
                     _fig.update_layout(
-                        **CHART_LAYOUT,
-                        title=f'Price of "{_flabel}" over time' if _f_binary else "Outcome Prices",
-                        xaxis_title="Date", yaxis_title="Price ($)", height=300,
-                        showlegend=not _f_binary,
+                        **CHART_LAYOUT, height=400, showlegend=not _f_binary,
                     )
-                    _fig.update_yaxes(range=[0, 1.05], gridcolor="rgba(255,255,255,0.05)")
+                    _fig.update_yaxes(range=[0, 105], title_text="Probability %",
+                                     gridcolor="rgba(255,255,255,0.05)", row=1, col=1)
+                    _fig.update_yaxes(title_text="Activity (pp)",
+                                     gridcolor="rgba(255,255,255,0.05)", row=2, col=1)
+                    _fig.update_xaxes(title_text="Date", row=2, col=1)
                     st.plotly_chart(_fig, use_container_width=True)
 
     # Navigation buttons
@@ -2270,67 +2350,95 @@ if selected_slug is not None:
                     else:
                         st.info("💸 P&L estimates unavailable — last trade price was post-resolution.")
 
-                    # Price history chart — show all outcomes for multi-outcome
+                    # Market dashboard chart — probability + volatility
                     if clob_tokens:
-                        with st.spinner("Loading price history…"):
+                        with st.spinner("Loading market data…"):
                             history = fetch_price_history(clob_tokens[0])
 
                         if history and len(history) > 2:
-                            st.markdown("#### 📈 Price History — Odds Over Time")
-                            fig_h = go.Figure()
+                            # Key stats row
+                            _mkt_vol = float(mkt.get("volumeNum", 0) or mkt.get("volume", 0) or 0)
+                            _mkt_vol_1w = float(mkt.get("volume1wk", 0) or 0)
+                            _mkt_vol_1m = float(mkt.get("volume1mo", 0) or 0)
+                            _ev_liq = float(ev.get("liquidity", 0) or 0)
+                            _s1, _s2, _s3, _s4 = st.columns(4)
+                            _s1.metric("💰 Market Vol", format_volume(_mkt_vol))
+                            _s2.metric("📅 Last Week", format_volume(_mkt_vol_1w))
+                            _s3.metric("📅 Last Month", format_volume(_mkt_vol_1m))
+                            _s4.metric("💧 Liquidity", format_volume(_ev_liq))
+
+                            st.markdown("#### 📊 Market Dashboard")
 
                             # First outcome
                             times = [datetime.fromtimestamp(h["t"]) for h in history]
                             prices_hist = [float(h["p"]) for h in history]
                             outcome_label = outcomes_list[0] if outcomes_list else "Outcome 1"
 
+                            fig_h = make_subplots(
+                                rows=2, cols=1, shared_xaxes=True,
+                                row_heights=[0.7, 0.3], vertical_spacing=0.06,
+                                subplot_titles=("Implied Probability", "Market Activity"),
+                            )
                             fig_h.add_trace(go.Scatter(
-                                x=times, y=prices_hist,
+                                x=times, y=[p * 100 for p in prices_hist],
                                 mode="lines",
                                 fill="tozeroy" if is_binary else None,
                                 line=dict(color=MULTI_COLORS[0], width=2),
                                 fillcolor="rgba(96,165,250,0.1)" if is_binary else None,
                                 name=outcome_label,
-                            ))
+                                hovertemplate="%{y:.1f}%<extra></extra>",
+                            ), row=1, col=1)
 
-                            # For multi-outcome: try to load additional token histories
+                            # Multi-outcome: load additional histories
                             if not is_binary and len(clob_tokens) > 1:
-                                for tok_idx, tok in enumerate(clob_tokens[1:4], start=1):  # up to 4 outcomes
+                                for tok_idx, tok in enumerate(clob_tokens[1:4], start=1):
                                     extra_hist = fetch_price_history(tok)
                                     if extra_hist and len(extra_hist) > 2:
                                         t2 = [datetime.fromtimestamp(h["t"]) for h in extra_hist]
-                                        p2 = [float(h["p"]) for h in extra_hist]
+                                        p2 = [float(h["p"]) * 100 for h in extra_hist]
                                         o_label = outcomes_list[tok_idx] if tok_idx < len(outcomes_list) else f"Outcome {tok_idx+1}"
                                         fig_h.add_trace(go.Scatter(
-                                            x=t2, y=p2,
-                                            mode="lines",
+                                            x=t2, y=p2, mode="lines",
                                             line=dict(color=MULTI_COLORS[tok_idx % len(MULTI_COLORS)], width=2),
                                             name=o_label,
-                                        ))
+                                            hovertemplate="%{y:.1f}%<extra></extra>",
+                                        ), row=1, col=1)
 
-                            # Add resolution line for binary markets
+                            # Resolution lines for binary
                             if is_binary and m_closed:
                                 if winner == outcome_label:
-                                    fig_h.add_hline(y=1.0, line_dash="dot",
+                                    fig_h.add_hline(y=100, line_dash="dot",
                                                     line_color="rgba(34,197,94,0.5)",
-                                                    annotation_text="Resolved ✓")
+                                                    annotation_text="Resolved ✓", row=1, col=1)
                                 else:
-                                    fig_h.add_hline(y=0.0, line_dash="dot",
+                                    fig_h.add_hline(y=0, line_dash="dot",
                                                     line_color="rgba(239,68,68,0.5)",
-                                                    annotation_text="Resolved ✗")
+                                                    annotation_text="Resolved ✗", row=1, col=1)
 
-                            chart_title = f"Price of \"{outcome_label}\" over time" if is_binary else "Outcome Prices Over Time"
+                            # Volatility panel — rolling absolute price changes
+                            if len(prices_hist) > 5:
+                                _ch = [abs(prices_hist[i] - prices_hist[i-1]) * 100 for i in range(1, len(prices_hist))]
+                                _w = max(len(_ch) // 20, 3)
+                                _vs = []
+                                for _ci in range(len(_ch)):
+                                    _st = max(0, _ci - _w + 1)
+                                    _vs.append(sum(_ch[_st:_ci+1]) / (_ci - _st + 1))
+                                fig_h.add_trace(go.Bar(
+                                    x=times[1:], y=_vs, name="Activity",
+                                    marker_color="rgba(251,191,36,0.5)",
+                                    hovertemplate="Activity: %{y:.2f}pp<extra></extra>",
+                                ), row=2, col=1)
+
                             fig_h.update_layout(
-                                **CHART_LAYOUT,
-                                title=chart_title,
-                                xaxis_title="Date",
-                                yaxis_title="Price ($)",
-                                height=300,
-                                showlegend=not is_binary,
+                                **CHART_LAYOUT, height=420, showlegend=not is_binary,
                             )
-                            fig_h.update_yaxes(range=[0, 1.05], gridcolor="rgba(255,255,255,0.05)")
+                            fig_h.update_yaxes(range=[0, 105], title_text="Probability %",
+                                               gridcolor="rgba(255,255,255,0.05)", row=1, col=1)
+                            fig_h.update_yaxes(title_text="Activity (pp)",
+                                               gridcolor="rgba(255,255,255,0.05)", row=2, col=1)
+                            fig_h.update_xaxes(title_text="Date", row=2, col=1)
                             st.plotly_chart(fig_h, use_container_width=True)
-                            st.caption(f"{len(history)} data points")
+                            st.caption(f"{len(history)} data points · Hourly resolution")
                         else:
                             st.caption("📉 No price history available for this market.")
                     else:
