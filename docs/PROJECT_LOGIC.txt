@@ -434,6 +434,69 @@ Applied to (5 locations):
 
 
 ================================================================================
+8c. BID-ASK SPREAD INDICATOR
+================================================================================
+
+Location: app.py, _spread_html() helper
+
+Displays bid, ask, and spread for active markets in both the Featured Market
+panel and Market Browser expanders. Color-coded: green (<3¢ tight), yellow
+(3-8¢ moderate), red (>8¢ wide).
+
+Helper: _spread_html(mkt: dict) -> str
+  Returns HTML row with Bid/Ask/Spread or "" if data unavailable.
+  Uses bestBid and bestAsk fields from market dict (previously unused API fields).
+  CSS classes: .spread-row, .spread-badge.tight/.mid/.wide
+
+Applied to (2 locations):
+  - Featured market panel: active bet calculator
+  - Market Browser: active market expanders
+
+
+================================================================================
+8d. DATA EXPORT (st.download_button)
+================================================================================
+
+Location: app.py, Analytics and Browser modes
+
+Analytics mode: "Export CSV" button exports filtered markets as CSV with columns:
+  question, resolved_winner, volume, implied_prob, primary_tag, crowd_was_right,
+  duration_days
+
+Browser mode: "Export JSON" button exports current category events as JSON with:
+  title, volume, volume24hr, liquidity, closed, markets count, slug
+
+
+================================================================================
+8e. OPEN INTEREST DISPLAY
+================================================================================
+
+Location: app.py, multiple locations
+
+Shows the openInterest field (total value of outstanding positions) from the
+Gamma API — previously unused. Displayed in:
+  - Newspaper lead story stats bar (after liquidity)
+  - Featured market panel meta row
+  - Featured market key stats row (replaces "Markets" count)
+  - Browser KPI row (new 6th column)
+
+
+================================================================================
+8f. ANALYTICS SECTION TOGGLES
+================================================================================
+
+Location: app.py, Analytics sidebar + chart sections
+
+Four st.toggle widgets in the analytics sidebar (Show/Hide Sections):
+  - show_overview: Overview Charts (Top 15 + Category Volume)
+  - show_accuracy: Accuracy & Timeline (Monthly + Crowd Accuracy)
+  - show_insights: Analyst Insights (Upsets + Efficiency Distribution)
+  - show_cards: Market Cards (paginated market list)
+
+All default to True. Stored in st.session_state.
+
+
+================================================================================
 9. CROSS-MODE NAVIGATION (Newspaper -> Market Browser)
 ================================================================================
 

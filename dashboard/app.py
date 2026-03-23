@@ -222,6 +222,16 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .delta.down { background: rgba(239,68,68,0.15); color: #fca5a5; }
 .delta.flat { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.35); }
 
+/* Bid-Ask spread row */
+.spread-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; font-size: 0.82rem; font-family: 'Inter', monospace; }
+.spread-item { display: flex; align-items: center; gap: 0.3rem; }
+.spread-label { color: rgba(255,255,255,0.4); }
+.spread-val { font-weight: 600; color: #e2e8f0; }
+.spread-badge { padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; }
+.spread-badge.tight { background: rgba(34,197,94,0.15); color: #86efac; }
+.spread-badge.mid   { background: rgba(251,191,36,0.15); color: #fcd34d; }
+.spread-badge.wide  { background: rgba(239,68,68,0.15); color: #fca5a5; }
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
@@ -493,6 +503,39 @@ def _get_market_delta(ev: dict) -> float | None:
             except (ValueError, TypeError):
                 pass
     return None
+
+
+def _spread_html(mkt: dict) -> str:
+    """Return an HTML row showing bid, ask, and spread for an active market.
+
+    Color-codes the spread: green (<3¢), yellow (3-8¢), red (>8¢).
+    Returns empty string if bid/ask data is unavailable.
+    """
+    try:
+        bid = float(mkt.get("bestBid", 0) or 0)
+        ask = float(mkt.get("bestAsk", 0) or 0)
+    except (ValueError, TypeError):
+        return ""
+    if bid <= 0 and ask <= 0:
+        return ""
+    spread = abs(ask - bid)
+    spread_cents = spread * 100
+    if spread_cents < 3:
+        cls, label = "tight", "Tight"
+    elif spread_cents < 8:
+        cls, label = "mid", "Moderate"
+    else:
+        cls, label = "wide", "Wide"
+    return (
+        f'<div class="spread-row">'
+        f'<div class="spread-item"><span class="spread-label">Bid</span> '
+        f'<span class="spread-val">{bid:.2f}</span></div>'
+        f'<div class="spread-item"><span class="spread-label">Ask</span> '
+        f'<span class="spread-val">{ask:.2f}</span></div>'
+        f'<div class="spread-item"><span class="spread-label">Spread</span> '
+        f'<span class="spread-badge {cls}">{spread_cents:.1f}¢ · {label}</span></div>'
+        f'</div>'
+    )
 
 
 CHART_LAYOUT = dict(
@@ -1469,6 +1512,7 @@ def _render_lead(ev: dict, article_text: str):
     vol_24h  = float(ev.get("volume24hr", 0) or 0)
     vol_tot  = float(ev.get("volume", 0) or 0)
     liq      = float(ev.get("liquidity", 0) or 0)
+    oi       = float(ev.get("openInterest", 0) or 0)
     tag_str  = _tag_str(ev)
     multi    = _is_multi_outcome(ev)
     now_str  = datetime.now().strftime("%I:%M %p")
@@ -1507,7 +1551,7 @@ def _render_lead(ev: dict, article_text: str):
         </div>
         {odds_section}
         <div class="np-lead-stats">
-            Vol {format_volume(vol_tot)} &bull; 24h {format_volume(vol_24h)} &bull; Liq {format_volume(liq)}
+            Vol {format_volume(vol_tot)} &bull; 24h {format_volume(vol_24h)} &bull; Liq {format_volume(liq)}{f" &bull; OI {format_volume(oi)}" if oi > 0 else ""}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1779,6 +1823,7 @@ if "np_goto_event" in st.session_state:
     _feat_vol = float(_feat_ev.get("volume", 0) or 0)
     _feat_24h = float(_feat_ev.get("volume24hr", 0) or 0)
     _feat_liq = float(_feat_ev.get("liquidity", 0) or 0)
+    _feat_oi  = float(_feat_ev.get("openInterest", 0) or 0)
     _feat_multi = _is_multi_outcome(_feat_ev)
 
     _feat_tags = [t.get("label", "") for t in (_feat_ev.get("tags") or [])
@@ -1801,6 +1846,7 @@ if "np_goto_event" in st.session_state:
             <span class="tag vol">\U0001f4b0 {format_volume(_feat_vol)}</span>
             <span>24h: {format_volume(_feat_24h)}</span>
             <span>Liquidity: {format_volume(_feat_liq)}</span>
+            {f'<span>OI: {format_volume(_feat_oi)}</span>' if _feat_oi > 0 else ''}
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">{_feat_tags_html}</div>
@@ -1868,6 +1914,9 @@ if "np_goto_event" in st.session_state:
         with st.expander(_f_label, expanded=(_fi == 0)):
             if not _fc:
                 # ── Active: Bet Calculator ─────────────────
+                _f_spread = _spread_html(_fm)
+                if _f_spread:
+                    st.markdown(_f_spread, unsafe_allow_html=True)
                 st.markdown("#### \U0001f4b0 Bet Payout Calculator")
                 _fc1, _fc2, _fc3 = st.columns([1, 1, 2])
                 with _fc1:
@@ -1955,7 +2004,7 @@ if "np_goto_event" in st.session_state:
                     _sc1.metric("\U0001f4b0 Total Volume", format_volume(_feat_vol))
                     _sc2.metric("\U0001f4c8 24h Volume", format_volume(_feat_24h))
                     _sc3.metric("\U0001f4a7 Liquidity", format_volume(_feat_liq))
-                    _sc4.metric("\U0001f4ca Markets", str(len(_feat_markets)))
+                    _sc4.metric("\U0001f4ca Open Interest", format_volume(_feat_oi) if _feat_oi > 0 else "N/A")
 
                     st.markdown("#### \U0001f4ca Market Dashboard")
                     _ftimes = [datetime.fromtimestamp(h["t"]) for h in _fhist]
@@ -2064,14 +2113,16 @@ if selected_slug is not None:
     n_closed = n_events - n_active
     total_vol = sum(float(e.get("volume", 0) or 0) for e in events)
     total_markets = sum(len(e.get("markets", [])) for e in events)
+    total_oi = sum(float(e.get("openInterest", 0) or 0) for e in events)
 
-    k1, k2, k3, k4, k5 = st.columns(5)
+    k1, k2, k3, k4, k5, k6 = st.columns(6)
     for col, (val, lbl) in zip(
-        [k1, k2, k3, k4, k5],
+        [k1, k2, k3, k4, k5, k6],
         [
             (f"{n_events}", "Events"),
             (f"{total_markets}", "Markets"),
             (format_volume(total_vol), "Total Volume"),
+            (format_volume(total_oi) if total_oi > 0 else "N/A", "Open Interest"),
             (f"{n_active}", "🟢 Active"),
             (f"{n_closed}", "⚫ Resolved"),
         ],
@@ -2140,6 +2191,27 @@ if selected_slug is not None:
     limit = st.session_state.cat_limit
     end = min(limit, total_filtered)
     st.caption(f"Showing events 1–{end} of {total_filtered}")
+
+    # ── Data Export for Browser ──────────────────────────────
+    _br_export = [
+        {"title": e.get("title", ""), "volume": float(e.get("volume", 0) or 0),
+         "volume24hr": float(e.get("volume24hr", 0) or 0),
+         "liquidity": float(e.get("liquidity", 0) or 0),
+         "closed": e.get("closed", True),
+         "markets": len(e.get("markets", [])),
+         "slug": e.get("slug", "")}
+        for e in filtered_events
+    ]
+    _br_dl1, _br_dl2 = st.columns([1, 5])
+    with _br_dl1:
+        st.download_button(
+            "📥 Export JSON",
+            data=json.dumps(_br_export, indent=2),
+            file_name=f"polymarket_{selected_slug or 'all'}_events.json",
+            mime="application/json",
+        )
+    with _br_dl2:
+        st.caption(f"{len(_br_export)} events")
 
     # ── Render event cards ────────────────────────────────────
     from datetime import datetime
@@ -2284,6 +2356,9 @@ if selected_slug is not None:
             with st.expander(exp_label, expanded=False):
                 if not m_closed:
                     # ━━━━━━━ ACTIVE MARKET: BET CALCULATOR ━━━━━━━
+                    _mkt_spread = _spread_html(mkt)
+                    if _mkt_spread:
+                        st.markdown(_mkt_spread, unsafe_allow_html=True)
                     st.markdown("#### 💰 Bet Payout Calculator")
 
                     calc_cols = st.columns([1, 1, 2])
@@ -2563,6 +2638,13 @@ with st.sidebar:
          "End Date (newest)", "End Date (oldest)", "Duration (longest)"])
 
     st.markdown("---")
+    st.markdown("### 👁️ Show/Hide Sections")
+    _show_overview = st.toggle("📈 Overview Charts", value=True, key="show_overview")
+    _show_accuracy = st.toggle("🎯 Accuracy & Timeline", value=True, key="show_accuracy")
+    _show_insights = st.toggle("🔬 Analyst Insights", value=True, key="show_insights")
+    _show_cards = st.toggle("📋 Market Cards", value=True, key="show_cards")
+
+    st.markdown("---")
     st.caption(f"Total markets in dataset: **{len(df):,}**")
 
 
@@ -2631,245 +2713,234 @@ for col, (val, label, sub) in zip([c1, c2, c3, c4, c5], kpi_data):
 
 st.markdown("")
 
-# ── Charts Row 1 ──────────────────────────────────────────────
-st.markdown('<div class="section-header">📈 Overview</div>', unsafe_allow_html=True)
-ch1, ch2 = st.columns(2)
+# ── Data Export ──────────────────────────────────────────────
+_export_cols = ["question", "resolved_winner", "volume", "implied_prob",
+                "primary_tag", "crowd_was_right", "duration_days"]
+_export_df = filtered[[c for c in _export_cols if c in filtered.columns]].copy()
+_dl1, _dl2 = st.columns([1, 5])
+with _dl1:
+    st.download_button(
+        "📥 Export CSV",
+        data=_export_df.to_csv(index=False),
+        file_name="polymarket_analytics.csv",
+        mime="text/csv",
+    )
+with _dl2:
+    st.caption(f"{len(_export_df):,} rows · Filtered analytics data")
 
-with ch1:
-    top15 = (filtered.nlargest(15, "volume")
-             [["question", "volume", "resolved_winner"]].copy())
-    top15["short_q"] = top15["question"].str[:55] + "…"
-    def _winner_color(w):
-        if w == "Yes": return "#86efac"      # green — Yes won
-        if w == "No": return "#fca5a5"       # red — No won
-        if w == "Unresolved": return "#93c5fd"  # blue — not resolved
-        return "#c4b5fd"  # purple — named winner (team/candidate)
-    top15["color"]   = top15["resolved_winner"].apply(_winner_color)
-    fig_top = go.Figure(go.Bar(
-        x=top15["volume"], y=top15["short_q"], orientation="h",
-        marker_color=top15["color"],
-        text=[format_volume(v) for v in top15["volume"]],
-        textposition="outside", textfont=dict(size=10),
-    ))
-    fig_top.update_layout(**CHART_LAYOUT, title="Top 15 Markets by Volume",
-                          xaxis_title="Volume ($)", height=420)
-    fig_top.update_yaxes(autorange="reversed", gridcolor="rgba(255,255,255,0.05)",
-                         tickfont=dict(size=10))
-    st.plotly_chart(fig_top, use_container_width=True)
-
-with ch2:
-    cat_vol = (filtered.groupby("primary_tag")["volume"]
-               .sum().sort_values(ascending=False).head(12).reset_index())
-    cat_vol.columns = ["Category", "Volume"]
-    fig_cat = px.bar(cat_vol, x="Volume", y="Category", orientation="h",
-                     title="Volume by Category", color="Volume",
-                     color_continuous_scale=["#4f46e5", "#60a5fa", "#a78bfa"],
-                     labels={"Volume": "Volume ($)", "Category": ""})
-    fig_cat.update_layout(**CHART_LAYOUT, coloraxis_showscale=False, height=420)
-    fig_cat.update_yaxes(autorange="reversed", gridcolor="rgba(255,255,255,0.05)")
-    st.plotly_chart(fig_cat, use_container_width=True)
-
-# ── Charts Row 2 ──────────────────────────────────────────────
-ch3, ch4 = st.columns(2)
-with ch3:
-    if "end_month" in filtered.columns:
-        timeline = (filtered.groupby("end_month")
-                    .agg(count=("volume", "count"), volume=("volume", "sum"))
-                    .reset_index().sort_values("end_month"))
-        fig_tl = go.Figure()
-        fig_tl.add_trace(go.Scatter(
-            x=timeline["end_month"], y=timeline["count"],
-            mode="lines+markers", fill="tozeroy",
-            line=dict(color="#60a5fa", width=2),
-            fillcolor="rgba(96,165,250,0.12)", name="Markets",
+# ── Charts Row 1: Overview ────────────────────────────────────
+if _show_overview:
+    st.markdown('<div class="section-header">📈 Overview</div>', unsafe_allow_html=True)
+    ch1, ch2 = st.columns(2)
+    with ch1:
+        top15 = (filtered.nlargest(15, "volume")
+                 [["question", "volume", "resolved_winner"]].copy())
+        top15["short_q"] = top15["question"].str[:55] + "…"
+        def _winner_color(w):
+            if w == "Yes": return "#86efac"
+            if w == "No": return "#fca5a5"
+            if w == "Unresolved": return "#93c5fd"
+            return "#c4b5fd"
+        top15["color"] = top15["resolved_winner"].apply(_winner_color)
+        fig_top = go.Figure(go.Bar(
+            x=top15["volume"], y=top15["short_q"], orientation="h",
+            marker_color=top15["color"],
+            text=[format_volume(v) for v in top15["volume"]],
+            textposition="outside", textfont=dict(size=10),
         ))
-        fig_tl.update_layout(**CHART_LAYOUT, title="Markets Closed per Month",
-                             xaxis_title="Month", yaxis_title="# Markets", height=300)
-        st.plotly_chart(fig_tl, use_container_width=True)
+        fig_top.update_layout(**CHART_LAYOUT, title="Top 15 Markets by Volume",
+                              xaxis_title="Volume ($)", height=420)
+        fig_top.update_yaxes(autorange="reversed", gridcolor="rgba(255,255,255,0.05)",
+                             tickfont=dict(size=10))
+        st.plotly_chart(fig_top, use_container_width=True)
+    with ch2:
+        cat_vol = (filtered.groupby("primary_tag")["volume"]
+                   .sum().sort_values(ascending=False).head(12).reset_index())
+        cat_vol.columns = ["Category", "Volume"]
+        fig_cat = px.bar(cat_vol, x="Volume", y="Category", orientation="h",
+                         title="Volume by Category", color="Volume",
+                         color_continuous_scale=["#4f46e5", "#60a5fa", "#a78bfa"],
+                         labels={"Volume": "Volume ($)", "Category": ""})
+        fig_cat.update_layout(**CHART_LAYOUT, coloraxis_showscale=False, height=420)
+        fig_cat.update_yaxes(autorange="reversed", gridcolor="rgba(255,255,255,0.05)")
+        st.plotly_chart(fig_cat, use_container_width=True)
 
-with ch4:
-    if "crowd_was_right" in filtered.columns:
-        acc_df = filtered[filtered["crowd_was_right"].notna()].copy()
-        acc_df["crowd_was_right"] = acc_df["crowd_was_right"].astype(float)
-        cat_acc = (acc_df.groupby("primary_tag")["crowd_was_right"]
-                   .agg(["mean", "count"]).reset_index())
-        cat_acc.columns = ["Category", "Accuracy", "Count"]
-        
-        # Only categories with enough resolved data
-        cat_acc = cat_acc[cat_acc["Count"] >= 5]
-        
-        if not cat_acc.empty:
-            cat_acc = cat_acc.sort_values("Accuracy", ascending=True).tail(12)  # Sort ASC so the best forms the top bar
-            cat_acc["AccPct"] = (cat_acc["Accuracy"] * 100).round(1)
-            
-            fig_acc = px.bar(cat_acc, x="AccPct", y="Category", orientation="h",
-                             title="Crowd Accuracy by Category (%)", color="AccPct",
-                             color_continuous_scale=["#ef4444", "#f59e0b", "#22c55e"],
-                             range_color=[40, 90],
-                             labels={"AccPct": "Accuracy (%)", "Category": ""},
-                             text="AccPct")
-            fig_acc.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
-            fig_acc.add_vline(x=50, line_dash="dash", line_color="rgba(255,255,255,0.2)",
-                              annotation_text="Random", annotation_font_size=10)
-            fig_acc.update_layout(**CHART_LAYOUT, coloraxis_showscale=False, height=350)
-            st.plotly_chart(fig_acc, use_container_width=True)
-        else:
-            st.info("Not enough resolved markets in these categories to calculate accuracy.")
+# ── Charts Row 2: Accuracy & Timeline ────────────────────────
+if _show_accuracy:
+    ch3, ch4 = st.columns(2)
+    with ch3:
+        if "end_month" in filtered.columns:
+            timeline = (filtered.groupby("end_month")
+                        .agg(count=("volume", "count"), volume=("volume", "sum"))
+                        .reset_index().sort_values("end_month"))
+            fig_tl = go.Figure()
+            fig_tl.add_trace(go.Scatter(
+                x=timeline["end_month"], y=timeline["count"],
+                mode="lines+markers", fill="tozeroy",
+                line=dict(color="#60a5fa", width=2),
+                fillcolor="rgba(96,165,250,0.12)", name="Markets",
+            ))
+            fig_tl.update_layout(**CHART_LAYOUT, title="Markets Closed per Month",
+                                 xaxis_title="Month", yaxis_title="# Markets", height=300)
+            st.plotly_chart(fig_tl, use_container_width=True)
+    with ch4:
+        if "crowd_was_right" in filtered.columns:
+            acc_df = filtered[filtered["crowd_was_right"].notna()].copy()
+            acc_df["crowd_was_right"] = acc_df["crowd_was_right"].astype(float)
+            cat_acc = (acc_df.groupby("primary_tag")["crowd_was_right"]
+                       .agg(["mean", "count"]).reset_index())
+            cat_acc.columns = ["Category", "Accuracy", "Count"]
+            cat_acc = cat_acc[cat_acc["Count"] >= 5]
+            if not cat_acc.empty:
+                cat_acc = cat_acc.sort_values("Accuracy", ascending=True).tail(12)
+                cat_acc["AccPct"] = (cat_acc["Accuracy"] * 100).round(1)
+                fig_acc = px.bar(cat_acc, x="AccPct", y="Category", orientation="h",
+                                 title="Crowd Accuracy by Category (%)", color="AccPct",
+                                 color_continuous_scale=["#ef4444", "#f59e0b", "#22c55e"],
+                                 range_color=[40, 90],
+                                 labels={"AccPct": "Accuracy (%)", "Category": ""},
+                                 text="AccPct")
+                fig_acc.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+                fig_acc.add_vline(x=50, line_dash="dash", line_color="rgba(255,255,255,0.2)",
+                                  annotation_text="Random", annotation_font_size=10)
+                fig_acc.update_layout(**CHART_LAYOUT, coloraxis_showscale=False, height=350)
+                st.plotly_chart(fig_acc, use_container_width=True)
+            else:
+                st.info("Not enough resolved markets in these categories to calculate accuracy.")
 
 # ── Charts Row 3: Analyst Insights ────────────────────────────
-st.markdown('<div class="section-header">🔬 Analyst Insights</div>', unsafe_allow_html=True)
-ch5, ch6 = st.columns(2)
-
-with ch5:
-    # Biggest upsets — resolved markets where the crowd was WRONG
-    if "crowd_was_right" in filtered.columns and "implied_prob" in filtered.columns:
-        upset_df = filtered[
-            (filtered["crowd_was_right"] == False) &
-            (filtered["implied_prob"].notna()) &
-            (filtered["volume"] > 0)
-        ].copy()
-        if not upset_df.empty:
-            # Surprise factor = how confident crowd was in the WRONG answer
-            upset_df["surprise"] = upset_df["implied_prob"].apply(
-                lambda p: max(p, 1-p) if p else 0.5
-            )
-            upset_df["impact"] = upset_df["surprise"] * upset_df["volume"]
-            upsets = upset_df.nlargest(10, "impact")[
-                ["question", "volume", "surprise", "resolved_winner"]
+if _show_insights:
+    st.markdown('<div class="section-header">🔬 Analyst Insights</div>', unsafe_allow_html=True)
+    ch5, ch6 = st.columns(2)
+    with ch5:
+        if "crowd_was_right" in filtered.columns and "implied_prob" in filtered.columns:
+            upset_df = filtered[
+                (filtered["crowd_was_right"] == False) &
+                (filtered["implied_prob"].notna()) &
+                (filtered["volume"] > 0)
             ].copy()
-            upsets["short_q"] = upsets["question"].str[:50] + "…"
-            upsets["confidence"] = (upsets["surprise"] * 100).round(0).astype(int).astype(str) + "%"
-
-            fig_upset = go.Figure(go.Bar(
-                x=upsets["volume"],
-                y=upsets["short_q"],
-                orientation="h",
-                marker_color="#ef4444",
-                text=[f"{format_volume(v)} ({c} wrong)"
-                      for v, c in zip(upsets["volume"], upsets["confidence"])],
-                textposition="outside",
-                textfont=dict(size=10),
-            ))
-            fig_upset.update_layout(
-                **CHART_LAYOUT,
-                title="🔴 Biggest Upsets (Crowd Got It Wrong)",
-                xaxis_title="Volume ($)",
-                height=350,
-            )
-            fig_upset.update_yaxes(autorange="reversed", gridcolor="rgba(255,255,255,0.05)",
-                                   tickfont=dict(size=9))
-            st.plotly_chart(fig_upset, use_container_width=True)
-        else:
-            st.info("No upset markets found in current filter.")
-
-with ch6:
-    # Market efficiency distribution
-    if "implied_prob" in filtered.columns:
-        eff_df = filtered[
-            (filtered["implied_prob"].notna()) &
-            (filtered["resolved_winner"] != "Unresolved")
-        ].copy()
-        if not eff_df.empty:
-            # Efficiency = how close the crowd was to being right
-            # If winner = outcomes[0] → eff = implied_prob, else 1 - implied_prob
-            def get_efficiency(row):
-                prob = row["implied_prob"]
-                winner = row["resolved_winner"]
-                outcomes = row.get("outcomes", [])
-                if not isinstance(outcomes, list) or len(outcomes) < 2:
+            if not upset_df.empty:
+                upset_df["surprise"] = upset_df["implied_prob"].apply(
+                    lambda p: max(p, 1-p) if p else 0.5)
+                upset_df["impact"] = upset_df["surprise"] * upset_df["volume"]
+                upsets = upset_df.nlargest(10, "impact")[
+                    ["question", "volume", "surprise", "resolved_winner"]].copy()
+                upsets["short_q"] = upsets["question"].str[:50] + "…"
+                upsets["confidence"] = (upsets["surprise"] * 100).round(0).astype(int).astype(str) + "%"
+                fig_upset = go.Figure(go.Bar(
+                    x=upsets["volume"], y=upsets["short_q"], orientation="h",
+                    marker_color="#ef4444",
+                    text=[f"{format_volume(v)} ({c} wrong)"
+                          for v, c in zip(upsets["volume"], upsets["confidence"])],
+                    textposition="outside", textfont=dict(size=10),
+                ))
+                fig_upset.update_layout(**CHART_LAYOUT,
+                    title="🔴 Biggest Upsets (Crowd Got It Wrong)",
+                    xaxis_title="Volume ($)", height=350)
+                fig_upset.update_yaxes(autorange="reversed",
+                    gridcolor="rgba(255,255,255,0.05)", tickfont=dict(size=9))
+                st.plotly_chart(fig_upset, use_container_width=True)
+            else:
+                st.info("No upset markets found in current filter.")
+    with ch6:
+        if "implied_prob" in filtered.columns:
+            eff_df = filtered[
+                (filtered["implied_prob"].notna()) &
+                (filtered["resolved_winner"] != "Unresolved")
+            ].copy()
+            if not eff_df.empty:
+                def get_efficiency(row):
+                    prob = row["implied_prob"]
+                    winner = row["resolved_winner"]
+                    outcomes = row.get("outcomes", [])
+                    if not isinstance(outcomes, list) or len(outcomes) < 2:
+                        return prob
+                    normed = {str(o).strip().lower() for o in outcomes}
+                    if normed == {"yes", "no"} and len(outcomes) == 2:
+                        return prob if winner == str(outcomes[0]) else (1 - prob)
                     return prob
-                # For binary Yes/No: if winner == first outcome, prob is right, else 1-prob
-                normed = {str(o).strip().lower() for o in outcomes}
-                if normed == {"yes", "no"} and len(outcomes) == 2:
-                    return prob if winner == str(outcomes[0]) else (1 - prob)
-                # For non-binary: prob represents the price of this specific outcome
-                # The winner's price should have been high = crowd was right
-                return prob
-
-            eff_df["efficiency"] = eff_df.apply(get_efficiency, axis=1)
-            eff_df["eff_pct"] = eff_df["efficiency"] * 100
-
-            fig_eff = px.histogram(
-                eff_df, x="eff_pct", nbins=20,
-                title="Market Efficiency Distribution",
-                labels={"eff_pct": "Crowd Confidence in Winner (%)"},
-                color_discrete_sequence=["#60a5fa"],
-            )
-            fig_eff.add_vline(x=50, line_dash="dash", line_color="rgba(255,255,255,0.3)",
-                              annotation_text="50% (coin flip)")
-            fig_eff.update_layout(**CHART_LAYOUT, height=350)
-            st.plotly_chart(fig_eff, use_container_width=True)
-        else:
-            st.info("No efficiency data available.")
+                eff_df["efficiency"] = eff_df.apply(get_efficiency, axis=1)
+                eff_df["eff_pct"] = eff_df["efficiency"] * 100
+                fig_eff = px.histogram(
+                    eff_df, x="eff_pct", nbins=20,
+                    title="Market Efficiency Distribution",
+                    labels={"eff_pct": "Crowd Confidence in Winner (%)"},
+                    color_discrete_sequence=["#60a5fa"],
+                )
+                fig_eff.add_vline(x=50, line_dash="dash", line_color="rgba(255,255,255,0.3)",
+                                  annotation_text="50% (coin flip)")
+                fig_eff.update_layout(**CHART_LAYOUT, height=350)
+                st.plotly_chart(fig_eff, use_container_width=True)
+            else:
+                st.info("No efficiency data available.")
 
 # ── Market Cards ──────────────────────────────────────────────
-st.markdown('<div class="section-header">📋 Markets</div>', unsafe_allow_html=True)
 ITEMS_PER_PAGE = 20
-
 all_filters = (search_query, winner_filter, acc_filter, tuple(selected_tags), volume_range, tuple(date_range) if date_range else None, sort_by)
 if "last_all_filters" not in st.session_state or st.session_state.last_all_filters != all_filters:
     st.session_state.all_limit = ITEMS_PER_PAGE
     st.session_state.last_all_filters = all_filters
 
-limit = st.session_state.all_limit
-end_idx = min(limit, total)
-page_df = filtered.iloc[:end_idx]
-st.caption(f"Showing 1–{end_idx} of {total:,} markets")
+if _show_cards:
+    st.markdown('<div class="section-header">📋 Markets</div>', unsafe_allow_html=True)
+    limit = st.session_state.all_limit
+    end_idx = min(limit, total)
+    page_df = filtered.iloc[:end_idx]
+    st.caption(f"Showing 1–{end_idx} of {total:,} markets")
 
-for _, row in page_df.iterrows():
-    winner = row.get("resolved_winner", "Unresolved")
-    if winner == "Unresolved":
-        winner_html = '<span class="tag">❓ Unresolved</span>'
-    elif winner == "No":
-        winner_html = f'<span class="tag lose">🏆 {winner}</span>'
-    else:
-        # "Yes" or any named winner (team/candidate) — show as win
-        winner_html = f'<span class="tag win">🏆 {winner}</span>'
-    vol_html = f'<span class="tag vol">💰 {format_volume(row["volume"])}</span>'
-    dur = row.get("duration_days")
-    dur_html = f'<span class="tag dur">⏱️ {int(dur)}d</span>' if pd.notna(dur) and dur > 0 else ""
-    tags_html = ""
-    if isinstance(row.get("tags"), list):
-        for t in row["tags"][:4]:
-            tags_html += f'<span class="tag">{t}</span>'
+    for _, row in page_df.iterrows():
+        winner = row.get("resolved_winner", "Unresolved")
+        if winner == "Unresolved":
+            winner_html = '<span class="tag">❓ Unresolved</span>'
+        elif winner == "No":
+            winner_html = f'<span class="tag lose">🏆 {winner}</span>'
+        else:
+            winner_html = f'<span class="tag win">🏆 {winner}</span>'
+        vol_html = f'<span class="tag vol">💰 {format_volume(row["volume"])}</span>'
+        dur = row.get("duration_days")
+        dur_html = f'<span class="tag dur">⏱️ {int(dur)}d</span>' if pd.notna(dur) and dur > 0 else ""
+        tags_html = ""
+        if isinstance(row.get("tags"), list):
+            for t in row["tags"][:4]:
+                tags_html += f'<span class="tag">{t}</span>'
 
-    s = row["startDate"].strftime("%b %d, %Y") if pd.notna(row.get("startDate")) else "—"
-    e = row["endDate"].strftime("%b %d, %Y")   if pd.notna(row.get("endDate"))   else "—"
+        s = row["startDate"].strftime("%b %d, %Y") if pd.notna(row.get("startDate")) else "—"
+        e = row["endDate"].strftime("%b %d, %Y")   if pd.notna(row.get("endDate"))   else "—"
 
-    win_pct  = row.get("crowd_win_pct")
-    lose_pct = row.get("crowd_lose_pct")
-    crowd_html = (f'<span class="tag acc">📊 {win_pct:.0%} right · {lose_pct:.0%} wrong</span>'
-                  if pd.notna(win_pct) and win_pct is not None else "")
+        win_pct  = row.get("crowd_win_pct")
+        lose_pct = row.get("crowd_lose_pct")
+        crowd_html = (f'<span class="tag acc">📊 {win_pct:.0%} right · {lose_pct:.0%} wrong</span>'
+                      if pd.notna(win_pct) and win_pct is not None else "")
 
-    loser_loss  = row.get("est_loser_loss")
-    winner_gain = row.get("est_winner_gain")
-    has_pnl     = pd.notna(loser_loss) and loser_loss is not None and loser_loss > 0
-    if has_pnl:
-        pnl_html = (
-            f'<div class="pnl-row">'
-            f'<span class="pnl-win">✅ Winners ~{format_volume(winner_gain)}</span>'
-            f'<span class="pnl-lose">❌ Losers ~{format_volume(loser_loss)}</span>'
-            f'<span class="pnl-note">(est. from last active price)</span>'
-            f'</div>')
-    else:
-        pnl_html = ('<div class="pnl-row">'
-                    '<span class="pnl-note">💸 P&L unavailable — needs trade history</span>'
-                    '</div>')
+        loser_loss  = row.get("est_loser_loss")
+        winner_gain = row.get("est_winner_gain")
+        has_pnl     = pd.notna(loser_loss) and loser_loss is not None and loser_loss > 0
+        if has_pnl:
+            pnl_html = (
+                f'<div class="pnl-row">'
+                f'<span class="pnl-win">✅ Winners ~{format_volume(winner_gain)}</span>'
+                f'<span class="pnl-lose">❌ Losers ~{format_volume(loser_loss)}</span>'
+                f'<span class="pnl-note">(est. from last active price)</span>'
+                f'</div>')
+        else:
+            pnl_html = ('<div class="pnl-row">'
+                        '<span class="pnl-note">💸 P&L unavailable — needs trade history</span>'
+                        '</div>')
 
-    st.markdown(
-        f'<div class="market-card">'
-        f'  <div class="question">{row["question"]}</div>'
-        f'  <div class="meta">{winner_html}{vol_html}{dur_html}{crowd_html}{tags_html}</div>'
-        f'  <div class="stats">📅 {s} → {e}</div>'
-        f'  {pnl_html}'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+        st.markdown(
+            f'<div class="market-card">'
+            f'  <div class="question">{row["question"]}</div>'
+            f'  <div class="meta">{winner_html}{vol_html}{dur_html}{crowd_html}{tags_html}</div>'
+            f'  <div class="stats">📅 {s} → {e}</div>'
+            f'  {pnl_html}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
-if limit < total:
-    if st.button("⬇️ Load More Markets", use_container_width=True):
-        st.session_state.all_limit += ITEMS_PER_PAGE
-        st.rerun()
+    if st.session_state.all_limit < total:
+        if st.button("⬇️ Load More Markets", use_container_width=True):
+            st.session_state.all_limit += ITEMS_PER_PAGE
+            st.rerun()
 
 st.markdown("---")
 st.caption("Polymarket Research Pipeline • Data sourced from Gamma API • Built with Streamlit + Plotly")
