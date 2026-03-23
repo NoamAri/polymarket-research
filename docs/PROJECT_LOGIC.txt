@@ -407,6 +407,33 @@ Applied to (9 locations):
 
 
 ================================================================================
+8b. PRICE CHANGE DELTA BADGES
+================================================================================
+
+Location: app.py, _delta_badge_html() and _get_market_delta() helpers
+
+Displays directional price change indicators (green up-arrow, red down-arrow)
+next to event titles and probability displays. Uses the oneDayPriceChange
+field from the Polymarket Gamma API (decimal, e.g. 0.05 = +5 pp).
+
+Helper functions:
+  _delta_badge_html(change: float | None) -> str
+    Returns <span class="delta up/down">▲ +5.0pp</span> or "" if no change.
+    CSS classes: .delta.up (green), .delta.down (red), .delta.flat (gray)
+
+  _get_market_delta(ev: dict) -> float | None
+    Extracts oneDayPriceChange from the first market in the event.
+    Falls back to oneWeekPriceChange if 1-day is unavailable.
+
+Applied to (5 locations):
+  - Newspaper ticker bar (after each probability)
+  - Lead story pull-quote label
+  - Compact market watch title
+  - Market Browser event card title
+  - Featured market panel title
+
+
+================================================================================
 9. CROSS-MODE NAVIGATION (Newspaper -> Market Browser)
 ================================================================================
 

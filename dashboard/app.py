@@ -216,6 +216,12 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 /* Team logos inline */
 .team-logo { height: 22px; width: 22px; vertical-align: middle; margin-right: 4px; object-fit: contain; display: inline-block; border-radius: 2px; }
 
+/* Price change delta badges */
+.delta { font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 6px; display: inline-block; margin-left: 0.3rem; }
+.delta.up { background: rgba(34,197,94,0.15); color: #86efac; }
+.delta.down { background: rgba(239,68,68,0.15); color: #fca5a5; }
+.delta.flat { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.35); }
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
@@ -443,6 +449,51 @@ def format_volume(v: float) -> str:
     if v >= 1_000_000: return f"${v/1_000_000:.1f}M"
     if v >= 1_000:     return f"${v/1_000:.1f}K"
     return f"${v:.0f}"
+
+def _delta_badge_html(change: float | None) -> str:
+    """Return an HTML badge showing a price change arrow and percentage.
+
+    Parameters
+    ----------
+    change : float or None
+        Decimal price change (e.g., 0.05 means +5 pp).  None or 0 returns empty string.
+    """
+    if change is None:
+        return ""
+    try:
+        ch = float(change)
+    except (ValueError, TypeError):
+        return ""
+    if abs(ch) < 0.001:
+        return ""
+    pp = ch * 100  # convert to percentage points
+    if ch > 0:
+        return f'<span class="delta up">▲ {pp:+.1f}pp</span>'
+    else:
+        return f'<span class="delta down">▼ {pp:+.1f}pp</span>'
+
+
+def _get_market_delta(ev: dict) -> float | None:
+    """Extract the best available price change from an event's first market.
+
+    Tries oneDayPriceChange first (market-level), then computes from event data.
+    """
+    markets = ev.get("markets", [])
+    if not markets:
+        return None
+    mkt = markets[0]
+    # Try market-level delta fields
+    for field in ("oneDayPriceChange", "oneWeekPriceChange"):
+        val = mkt.get(field)
+        if val is not None:
+            try:
+                v = float(val)
+                if abs(v) > 0.0001:
+                    return v
+            except (ValueError, TypeError):
+                pass
+    return None
+
 
 CHART_LAYOUT = dict(
     plot_bgcolor="rgba(0,0,0,0)",
@@ -1423,6 +1474,8 @@ def _render_lead(ev: dict, article_text: str):
     now_str  = datetime.now().strftime("%I:%M %p")
     rt       = _reading_time(article_text)
 
+    _lead_delta = _delta_badge_html(_get_market_delta(ev))
+
     if multi:
         all_outcomes = _get_all_outcomes(ev)
         top_name = all_outcomes[0][0] if all_outcomes else "—"
@@ -1449,7 +1502,7 @@ def _render_lead(ev: dict, article_text: str):
             <div class="np-lead-text">{article_text}</div>
             <div class="np-pull-quote">
                 <span class="np-pq-num">{pq_num}</span>
-                <span class="np-pq-label">{_add_icon_html(pq_label)}</span>
+                <span class="np-pq-label">{_add_icon_html(pq_label)}{_lead_delta}</span>
             </div>
         </div>
         {odds_section}
@@ -1491,6 +1544,7 @@ def _render_compact(ev: dict):
     title   = ev.get("title", "Breaking Market")
     vol_24h = float(ev.get("volume24hr", 0) or 0)
     multi   = _is_multi_outcome(ev)
+    _cpt_delta = _delta_badge_html(_get_market_delta(ev))
 
     if multi:
         all_outcomes = _get_all_outcomes(ev)
@@ -1508,7 +1562,7 @@ def _render_compact(ev: dict):
 
     st.markdown(f"""
     <div class="np-compact">
-        <div class="np-compact-title">{title}</div>
+        <div class="np-compact-title">{title}{_cpt_delta}</div>
         <div class="np-compact-odds">{odds_str}</div>
         <div class="np-compact-vol">24h vol: {format_volume(vol_24h)}</div>
     </div>
@@ -1608,6 +1662,7 @@ if app_mode == "📰 Live Newspaper":
     # Ticker bar
     ticker_parts = []
     for ev in news_events[:8]:
+        _tk_delta = _delta_badge_html(_get_market_delta(ev))
         multi = _is_multi_outcome(ev)
         if multi:
             all_outcomes = _get_all_outcomes(ev)
@@ -1617,7 +1672,7 @@ if app_mode == "📰 Live Newspaper":
                 display_name = _add_icon_html(name[:20])
                 ticker_parts.append(
                     f'<span class="{cls}">{ev.get("title","")[:30]} &bull; '
-                    f'{display_name} {prob:.0%}</span>'
+                    f'{display_name} {prob:.0%}{_tk_delta}</span>'
                 )
         else:
             mkt = ev.get("markets", [{}])[0]
@@ -1626,7 +1681,7 @@ if app_mode == "📰 Live Newspaper":
                 cls = "tk-up" if top_prob >= 0.6 else "tk-down" if top_prob <= 0.4 else ""
                 ticker_parts.append(
                     f'<span class="{cls}">{ev.get("title","")[:40]} &bull; '
-                    f'{top_outcome} {top_prob:.0%}</span>'
+                    f'{top_outcome} {top_prob:.0%}{_tk_delta}</span>'
                 )
     if ticker_parts:
         st.markdown(
@@ -1731,6 +1786,7 @@ if "np_goto_event" in st.session_state:
     _feat_tags_html = " ".join(f'<span class="tag">{t}</span>' for t in _feat_tags[:5])
     _feat_status_cls = "ended" if _feat_closed else "live"
     _feat_status_text = "\u26ab Resolved" if _feat_closed else "\U0001f7e2 Live"
+    _feat_delta = _delta_badge_html(_get_market_delta(_feat_ev))
 
     # Polymarket link (if slug available)
     _pm_slug = _feat_ev.get("slug", "")
@@ -1739,7 +1795,7 @@ if "np_goto_event" in st.session_state:
     st.markdown(f"""
     <div class="np-featured">
         <div class="np-featured-label">\U0001f4cc FROM THE CHRONICLE</div>
-        <div class="np-featured-title">{_feat_title}</div>
+        <div class="np-featured-title">{_feat_title}{_feat_delta}</div>
         <div class="np-featured-meta">
             <span class="tag {_feat_status_cls}">{_feat_status_text}</span>
             <span class="tag vol">\U0001f4b0 {format_volume(_feat_vol)}</span>
@@ -2106,6 +2162,9 @@ if selected_slug is not None:
         vol_str = format_volume(ev_vol)
         n_markets = len(markets)
 
+        # Price change delta badge for active events
+        _ev_delta = _delta_badge_html(_get_market_delta(ev)) if not is_closed else ""
+
         # Event-level tags
         ev_tag_labels = []
         for tag in (ev.get("tags") or [])[:5]:
@@ -2127,7 +2186,7 @@ if selected_slug is not None:
         _ev_pm_link = _polymarket_link_html(_ev_slug, "View on Polymarket")
         st.markdown(
             f'<div class="event-card">'
-            f'  <div class="event-title">{title}</div>'
+            f'  <div class="event-title">{title}{_ev_delta}</div>'
             f'  <div class="event-meta">'
             f'    <span class="tag {status_cls}">{status_tag}</span>'
             f'    <span class="tag vol">\U0001f4b0 {vol_str}</span>'
